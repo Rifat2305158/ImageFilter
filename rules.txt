@@ -1,0 +1,116 @@
+You are helping develop an academic Signals and Linear Systems project called:
+
+"Image Blur, Sharpening & Edge Detection Studio"
+
+Technology stack:
+- Python
+- Tkinter + ttk for the graphical user interface
+- NumPy for numerical array operations
+- Pillow for image loading, saving, grayscale conversion and GUI image preparation
+- Matplotlib for histograms and signal-analysis visualization
+- pytest for automated testing
+- Git/GitHub for version control
+
+IMPORTANT ARCHITECTURAL REQUIREMENTS:
+
+1. The project must be educational and suitable for a university Signals and Linear Systems project.
+
+2. The main signal-processing concept is 2D discrete convolution.
+
+3. The actual convolution operation MUST be implemented manually.
+
+4. Do NOT use:
+   - scipy.ndimage.convolve
+   - scipy.signal.convolve2d
+   - cv2.filter2D
+   - PIL.ImageFilter for implementing the required filters
+   - any other black-box convolution/filtering API
+
+5. NumPy may be used for:
+   - arrays
+   - numerical calculations
+   - matrix operations where appropriate
+   - square root
+   - clipping
+   - type conversion
+
+6. Pillow may be used for:
+   - loading images
+   - saving images
+   - converting RGB images to grayscale
+   - converting processed arrays into displayable images
+   - resizing images ONLY for GUI display when necessary
+
+7. Tkinter/ttk must be used for the GUI.
+
+8. Matplotlib may be embedded into Tkinter using FigureCanvasTkAgg for:
+   - histograms
+   - comparison plots
+   - signal-analysis visualizations
+
+9. The signal-processing core MUST NOT import Tkinter.
+
+10. GUI code MUST NOT contain the mathematical implementation of convolution.
+
+11. Keep the architecture modular and understandable enough to explain during a viva.
+
+12. Prefer simple classes and functions over unnecessarily complicated design patterns.
+
+13. Every major signal-processing function should have:
+   - clear docstrings
+   - meaningful variable names
+   - input validation
+   - comments explaining important mathematical operations
+
+14. Write automated tests for the signal-processing modules.
+
+15. Run pytest after implementing each major module.
+
+16. Do not implement the entire application in one step.
+
+17. Work incrementally according to the development phases I provide.
+
+18. Before modifying files:
+   - inspect the current project structure
+   - inspect existing implementations
+   - preserve working functionality
+   - avoid overwriting unrelated work
+
+19. After each phase:
+   - explain what was implemented
+   - list modified/created files
+   - report test results
+   - mention any remaining issues
+   - do not silently rewrite unrelated modules
+
+20. The final application should provide:
+   - image loading
+   - grayscale preprocessing
+   - blur filters
+   - sharpening filters
+   - horizontal edge detection
+   - vertical edge detection
+   - combined edge detection
+   - interactive kernel editor
+   - original/processed image comparison
+   - histogram visualization
+   - image statistics
+   - kernel visualization
+   - filter comparison
+   - image export
+   - useful error messages
+
+21. The GUI should be clean and professional but should not become more complicated than necessary.
+
+22. Use Tkinter's mainloop correctly.
+
+23. Avoid blocking the Tkinter GUI during expensive processing. If necessary later, use a background worker/thread carefully and update the GUI through Tkinter's event mechanism.
+
+24. Do not optimize prematurely. First make the mathematically correct implementation work.
+
+25. Maintain mathematical correctness over visual effects.
+
+26. This is an academic signal-processing project, NOT merely an image-editing application.
+
+Begin only with the requested development phase.
+Do not jump ahead to later phases unless explicitly asked.
