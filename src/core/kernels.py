@@ -1,0 +1,121 @@
+"""
+Library of convolution kernels for image filtering.
+
+This module defines standard matrices used for blurring, sharpening, 
+and edge detection. Kernels are represented as 2D NumPy arrays.
+No actual convolution is performed here.
+"""
+
+import numpy as np
+
+# ==========================================
+# BLUR KERNELS
+# Purpose: Low-pass filters that average neighboring pixels to reduce high-frequency noise.
+# Sum property: Elements should sum to 1.0 to preserve overall image brightness.
+# ==========================================
+
+BOX_BLUR_3X3 = np.ones((3, 3), dtype=np.float64) / 9.0
+
+BOX_BLUR_5X5 = np.ones((5, 5), dtype=np.float64) / 25.0
+
+# 3x3 Gaussian-like kernel (approximation using binomial coefficients)
+GAUSSIAN_BLUR_3X3 = np.array([
+    [1, 2, 1],
+    [2, 4, 2],
+    [1, 2, 1]
+], dtype=np.float64) / 16.0
+
+# 5x5 Gaussian-like kernel (approximation using binomial coefficients)
+GAUSSIAN_BLUR_5X5 = np.array([
+    [1,  4,  6,  4, 1],
+    [4, 16, 24, 16, 4],
+    [6, 24, 36, 24, 6],
+    [4, 16, 24, 16, 4],
+    [1,  4,  6,  4, 1]
+], dtype=np.float64) / 256.0
+
+
+# ==========================================
+# SHARPEN KERNELS
+# Purpose: High-pass filters that enhance edges by subtracting the blurred version 
+# from the original image (or adding the Laplacian).
+# Sum property: Elements typically sum to 1.0 to preserve base brightness while 
+# amplifying local differences.
+# ==========================================
+
+# Basic sharpening (emphasizes center pixel relative to immediate 4 neighbors)
+SHARPEN_BASIC = np.array([
+    [ 0, -1,  0],
+    [-1,  5, -1],
+    [ 0, -1,  0]
+], dtype=np.float64)
+
+# Strong sharpening (emphasizes center pixel relative to all 8 neighbors)
+SHARPEN_STRONG = np.array([
+    [-1, -1, -1],
+    [-1,  9, -1],
+    [-1, -1, -1]
+], dtype=np.float64)
+
+# Laplacian-based sharpening 
+# Derivation: Original + (Original - Smoothed) equivalent
+SHARPEN_LAPLACIAN = np.array([
+    [ 1,  1,  1],
+    [ 1, -7,  1],
+    [ 1,  1,  1]
+], dtype=np.float64)
+
+
+# ==========================================
+# EDGE DETECTION KERNELS
+# Purpose: Directional or isotropic high-pass filters that approximate derivatives.
+# Sum property: Elements must sum to 0.0, so areas of constant intensity become 0.
+# ==========================================
+
+# Sobel: Approximates the gradient with Gaussian smoothing perpendicular to the derivative.
+SOBEL_HORIZONTAL = np.array([
+    [-1, 0, 1],
+    [-2, 0, 2],
+    [-1, 0, 1]
+], dtype=np.float64)
+
+SOBEL_VERTICAL = np.array([
+    [-1, -2, -1],
+    [ 0,  0,  0],
+    [ 1,  2,  1]
+], dtype=np.float64)
+
+# Prewitt: Similar to Sobel but applies box smoothing instead of Gaussian.
+PREWITT_HORIZONTAL = np.array([
+    [-1, 0, 1],
+    [-1, 0, 1],
+    [-1, 0, 1]
+], dtype=np.float64)
+
+PREWITT_VERTICAL = np.array([
+    [-1, -1, -1],
+    [ 0,  0,  0],
+    [ 1,  1,  1]
+], dtype=np.float64)
+
+# Roberts Cross: Approximates the gradient diagonally. 
+# Note: Usually 2x2, but padded to 3x3 with zeros here because our convolution engine 
+# requires odd-sized kernels (as specified in Phase 2).
+ROBERTS_X = np.array([
+    [ 1,  0,  0],
+    [ 0, -1,  0],
+    [ 0,  0,  0]
+], dtype=np.float64)
+
+ROBERTS_Y = np.array([
+    [ 0,  1,  0],
+    [-1,  0,  0],
+    [ 0,  0,  0]
+], dtype=np.float64)
+
+# Laplacian: Isotropic 2nd-derivative operator.
+EDGE_LAPLACIAN = np.array([
+    [ 0,  1,  0],
+    [ 1, -4,  1],
+    [ 0,  1,  0]
+], dtype=np.float64)
