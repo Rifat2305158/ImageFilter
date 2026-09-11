@@ -1,0 +1,32 @@
+Prompt so far :
+
+Implement image sharpening.
+
+File:
+app/filters/sharpen.py
+
+Use manual convolution.
+
+Implement:
+
+- basic sharpening
+- strong sharpening
+- Laplacian-based sharpening
+
+Requirements:
+
+1. Use floating-point intermediate arrays.
+
+2. Perform controlled output normalization/clipping.
+
+3. Do not use PIL/OpenCV/scipy filtering.
+
+4. Keep mathematical operations clearly documented.
+
+5. Add tests for:
+   - constant image
+   - simple edge image
+   - impulse image
+   - clipping behavior
+
+Run pytest.
