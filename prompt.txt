@@ -1,5 +1,342 @@
-Prompt so far :
+init prompt:
+You are helping develop an academic Signals and Linear Systems project called:
 
+"Image Blur, Sharpening & Edge Detection Studio"
+
+Technology stack:
+- Python
+- Tkinter + ttk for the graphical user interface
+- NumPy for numerical array operations
+- Pillow for image loading, saving, grayscale conversion and GUI image preparation
+- Matplotlib for histograms and signal-analysis visualization
+- pytest for automated testing
+- Git/GitHub for version control
+
+IMPORTANT ARCHITECTURAL REQUIREMENTS:
+
+1. The project must be educational and suitable for a university Signals and Linear Systems project.
+
+2. The main signal-processing concept is 2D discrete convolution.
+
+3. The actual convolution operation MUST be implemented manually.
+
+4. Do NOT use:
+   - scipy.ndimage.convolve
+   - scipy.signal.convolve2d
+   - cv2.filter2D
+   - PIL.ImageFilter for implementing the required filters
+   - any other black-box convolution/filtering API
+
+5. NumPy may be used for:
+   - arrays
+   - numerical calculations
+   - matrix operations where appropriate
+   - square root
+   - clipping
+   - type conversion
+
+6. Pillow may be used for:
+   - loading images
+   - saving images
+   - converting RGB images to grayscale
+   - converting processed arrays into displayable images
+   - resizing images ONLY for GUI display when necessary
+
+7. Tkinter/ttk must be used for the GUI.
+
+8. Matplotlib may be embedded into Tkinter using FigureCanvasTkAgg for:
+   - histograms
+   - comparison plots
+   - signal-analysis visualizations
+
+9. The signal-processing core MUST NOT import Tkinter.
+
+10. GUI code MUST NOT contain the mathematical implementation of convolution.
+
+11. Keep the architecture modular and understandable enough to explain during a viva.
+
+12. Prefer simple classes and functions over unnecessarily complicated design patterns.
+
+13. Every major signal-processing function should have:
+   - clear docstrings
+   - meaningful variable names
+   - input validation
+   - comments explaining important mathematical operations
+
+14. Write automated tests for the signal-processing modules.
+
+15. Run pytest after implementing each major module.
+
+16. Do not implement the entire application in one step.
+
+17. Work incrementally according to the development phases I provide.
+
+18. Before modifying files:
+   - inspect the current project structure
+   - inspect existing implementations
+   - preserve working functionality
+   - avoid overwriting unrelated work
+
+19. After each phase:
+   - explain what was implemented
+   - list modified/created files
+   - report test results
+   - mention any remaining issues
+   - do not silently rewrite unrelated modules
+
+20. The final application should provide:
+   - image loading
+   - grayscale preprocessing
+   - blur filters
+   - sharpening filters
+   - horizontal edge detection
+   - vertical edge detection
+   - combined edge detection
+   - interactive kernel editor
+   - original/processed image comparison
+   - histogram visualization
+   - image statistics
+   - kernel visualization
+   - filter comparison
+   - image export
+   - useful error messages
+
+21. The GUI should be clean and professional but should not become more complicated than necessary.
+
+22. Use Tkinter's mainloop correctly.
+
+23. Avoid blocking the Tkinter GUI during expensive processing. If necessary later, use a background worker/thread carefully and update the GUI through Tkinter's event mechanism.
+
+24. Do not optimize prematurely. First make the mathematically correct implementation work.
+
+25. Maintain mathematical correctness over visual effects.
+
+26. This is an academic signal-processing project, NOT merely an image-editing application.
+
+Begin only with the requested development phase.
+Do not jump ahead to later phases unless explicitly asked.
+
+
+
+##01-architectur:
+
+Analyze the current project directory.
+
+Do not implement the complete application yet.
+
+Design the architecture for the Image Blur, Sharpening & Edge Detection Studio using:
+
+- Python
+- Tkinter + ttk
+- NumPy
+- Pillow
+- Matplotlib
+- pytest
+
+Create the planned directory structure and explain the responsibility of each module.
+
+The architecture must strictly separate:
+
+1. Signal-processing core
+2. Filter implementations
+3. Image I/O
+4. Analysis
+5. Tkinter GUI
+
+The core must not import Tkinter.
+
+Do not implement the actual filtering algorithms yet.
+
+Create only the minimal project scaffolding required for the next phase.
+
+Verify that the project can be imported without errors.
+
+
+
+##2
+Implement the manual 2D discrete convolution engine.
+
+File:
+app/core/convolution.py
+
+Requirements:
+
+1. Accept a 2D grayscale image as a NumPy array.
+
+2. Accept an arbitrary odd-sized 2D kernel:
+   - 3x3
+   - 5x5
+   - 7x7
+   - potentially other odd dimensions
+
+3. Validate:
+   - image is 2D
+   - kernel is 2D
+   - kernel dimensions are odd
+   - kernel is not empty
+   - input dimensions are valid
+
+4. Implement actual mathematical 2D convolution manually using loops.
+
+5. Explicitly flip the kernel before convolution.
+
+6. Support padding modes:
+   - zero
+   - reflect
+   - edge
+
+7. Use floating-point intermediate results.
+
+8. Do NOT use any built-in convolution/filter function.
+
+9. Keep this module completely independent of Tkinter and Pillow.
+
+10. Add comprehensive pytest tests.
+
+Tests must include:
+
+- identity kernel
+- averaging kernel
+- known small matrix
+- kernel flipping
+- zero padding
+- reflect padding
+- edge padding
+- invalid kernel dimensions
+- invalid image dimensions
+- 3x3 kernel
+- 5x5 kernel
+
+Run:
+
+pytest -v
+
+Do not proceed to GUI work.
+
+##3
+Implement the kernel library.
+
+File:
+app/core/kernels.py
+
+Create functions/constants for:
+
+BLUR:
+- 3x3 box blur
+- 5x5 box blur
+- Gaussian-like 3x3
+- Gaussian-like 5x5
+
+SHARPEN:
+- basic sharpening
+- strong sharpening
+- Laplacian-based sharpening
+
+EDGE:
+- Sobel horizontal
+- Sobel vertical
+- Prewitt horizontal
+- Prewitt vertical
+- Roberts X
+- Roberts Y
+- Laplacian
+
+Requirements:
+
+1. Kernels must be represented using NumPy arrays.
+
+2. Document the mathematical purpose of each kernel.
+
+3. Do not perform convolution here.
+
+4. Add tests verifying:
+   - dimensions
+   - expected coefficients
+   - symmetry where applicable
+   - sum properties where applicable
+
+Run pytest.
+
+Do not modify GUI code.
+
+
+##3
+Implement the blur filters.
+
+File:
+app/filters/blur.py
+
+Use the manual convolution engine from:
+
+app/core/convolution.py
+
+Implement:
+
+- box blur
+- Gaussian-like blur
+
+Requirements:
+
+1. Never use scipy/OpenCV/PIL filtering functions.
+
+2. Preserve floating-point intermediate results.
+
+3. Provide a clean API that accepts:
+   - image
+   - kernel choice
+   - padding mode
+
+4. Return a NumPy array.
+
+5. Add tests using synthetic images.
+
+6. Verify that blur reduces high-frequency variations.
+
+Run pytest.
+
+Keep the module independent from Tkinter.
+
+
+##4
+Implement the blur filters.
+
+File:
+app/filters/blur.py
+
+Use the manual convolution engine from:
+
+app/core/convolution.py
+
+Implement:
+
+- box blur
+- Gaussian-like blur
+
+Requirements:
+
+1. Never use scipy/OpenCV/PIL filtering functions.
+
+2. Preserve floating-point intermediate results.
+
+3. Provide a clean API that accepts:
+   - image
+   - kernel choice
+   - padding mode
+
+4. Return a NumPy array.
+
+5. Add tests using synthetic images.
+
+6. Verify that blur reduces high-frequency variations.
+
+Run pytest.
+
+Keep the module independent from Tkinter.
+
+
+
+
+##5
 Implement image sharpening.
 
 File:
