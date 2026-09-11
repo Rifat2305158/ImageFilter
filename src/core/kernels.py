@@ -1,12 +1,46 @@
 """
 Library of convolution kernels for image filtering.
 
-This module defines standard matrices used for blurring, sharpening, 
+This module defines standard matrices used for blurring, sharpening,
 and edge detection. Kernels are represented as 2D NumPy arrays.
 No actual convolution is performed here.
 """
 
 import numpy as np
+
+
+def make_gaussian_kernel(size: int, sigma: float = 0.0) -> np.ndarray:
+    """
+    Generate a square Gaussian blur kernel of arbitrary odd size.
+
+    Uses the 2D Gaussian formula:
+        G(x, y) = exp(-(x² + y²) / (2σ²))
+
+    If sigma <= 0, it is computed automatically as:
+        σ = 0.3 * ((size - 1) / 2 - 1) + 0.8   (OpenCV heuristic)
+
+    Args:
+        size (int): Odd integer kernel size (e.g. 3, 5, 7, 9, 11).
+        sigma (float): Standard deviation. Auto-computed if <= 0.
+
+    Returns:
+        np.ndarray: Normalized 2D float64 Gaussian kernel (sums to 1.0).
+
+    Raises:
+        ValueError: If size is even or less than 1.
+    """
+    if size < 1 or size % 2 == 0:
+        raise ValueError(f"Kernel size must be a positive odd integer, got {size}.")
+
+    if sigma <= 0.0:
+        sigma = 0.3 * ((size - 1) / 2 - 1) + 0.8
+
+    half = size // 2
+    coords = np.arange(-half, half + 1, dtype=np.float64)
+    x, y = np.meshgrid(coords, coords)
+    kernel = np.exp(-(x ** 2 + y ** 2) / (2.0 * sigma ** 2))
+    return kernel / kernel.sum()
+
 
 # ==========================================
 # BLUR KERNELS
@@ -15,8 +49,9 @@ import numpy as np
 # ==========================================
 
 BOX_BLUR_3X3 = np.ones((3, 3), dtype=np.float64) / 9.0
-
 BOX_BLUR_5X5 = np.ones((5, 5), dtype=np.float64) / 25.0
+BOX_BLUR_7X7 = np.ones((7, 7), dtype=np.float64) / 49.0
+BOX_BLUR_9X9 = np.ones((9, 9), dtype=np.float64) / 81.0
 
 # 3x3 Gaussian-like kernel (approximation using binomial coefficients)
 GAUSSIAN_BLUR_3X3 = np.array([
@@ -33,6 +68,10 @@ GAUSSIAN_BLUR_5X5 = np.array([
     [4, 16, 24, 16, 4],
     [1,  4,  6,  4, 1]
 ], dtype=np.float64) / 256.0
+
+# 7x7 and 9x9 Gaussian kernels (generated programmatically)
+GAUSSIAN_BLUR_7X7 = make_gaussian_kernel(7)
+GAUSSIAN_BLUR_9X9 = make_gaussian_kernel(9)
 
 
 # ==========================================

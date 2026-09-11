@@ -3,34 +3,65 @@ import numpy as np
 from src.core.convolution import convolve2d
 from src.core import kernels
 
-def apply_blur(image: np.ndarray, blur_type: str = 'box', size: int = 3, padding_mode: str = 'edge') -> np.ndarray:
+
+# Supported kernel sizes for each blur type
+_BOX_KERNEL_MAP = {
+    3: kernels.BOX_BLUR_3X3,
+    5: kernels.BOX_BLUR_5X5,
+    7: kernels.BOX_BLUR_7X7,
+    9: kernels.BOX_BLUR_9X9,
+}
+
+_GAUSSIAN_KERNEL_MAP = {
+    3: kernels.GAUSSIAN_BLUR_3X3,
+    5: kernels.GAUSSIAN_BLUR_5X5,
+    7: kernels.GAUSSIAN_BLUR_7X7,
+    9: kernels.GAUSSIAN_BLUR_9X9,
+}
+
+
+def apply_blur(
+    image: np.ndarray,
+    blur_type: str = 'box',
+    size: int = 3,
+    padding_mode: str = 'edge',
+    iterations: int = 1,
+) -> np.ndarray:
     """
     Apply a blur filter to a 2D grayscale image using the manual convolution engine.
-    
+
     Args:
         image (np.ndarray): The 2D input image.
-        blur_type (str): The type of blur. Options are 'box' or 'gaussian'.
-        size (int): The size of the filter kernel. Options are 3 or 5.
-        padding_mode (str): Padding strategy ('zero', 'reflect', 'edge'). Default is 'edge'.
-        
+        blur_type (str): 'box' or 'gaussian'.
+        size (int): Kernel size — 3, 5, 7, or 9.
+        padding_mode (str): Padding strategy ('zero', 'reflect', 'edge'). Default 'edge'.
+        iterations (int): Number of passes to apply the filter (default 1).
+                          Repeated application produces progressively stronger blur,
+                          equivalent to a larger effective kernel radius.
+
     Returns:
         np.ndarray: The blurred image as a float64 numpy array.
+
+    Raises:
+        ValueError: If blur_type or size is unsupported.
     """
     if blur_type == 'box':
-        if size == 3:
-            kernel = kernels.BOX_BLUR_3X3
-        elif size == 5:
-            kernel = kernels.BOX_BLUR_5X5
-        else:
-            raise ValueError("Unsupported size for box blur. Choose 3 or 5.")
+        kernel_map = _BOX_KERNEL_MAP
     elif blur_type == 'gaussian':
-        if size == 3:
-            kernel = kernels.GAUSSIAN_BLUR_3X3
-        elif size == 5:
-            kernel = kernels.GAUSSIAN_BLUR_5X5
-        else:
-            raise ValueError("Unsupported size for gaussian blur. Choose 3 or 5.")
+        kernel_map = _GAUSSIAN_KERNEL_MAP
     else:
-        raise ValueError("Unsupported blur_type. Choose 'box' or 'gaussian'.")
-        
-    return convolve2d(image, kernel, padding_mode=padding_mode)
+        raise ValueError(f"Unsupported blur_type '{blur_type}'. Choose 'box' or 'gaussian'.")
+
+    if size not in kernel_map:
+        raise ValueError(
+            f"Unsupported size {size} for {blur_type} blur. "
+            f"Choose one of: {sorted(kernel_map.keys())}."
+        )
+
+    kernel = kernel_map[size]
+    result = image.astype(np.float64)
+
+    for _ in range(max(1, iterations)):
+        result = convolve2d(result, kernel, padding_mode=padding_mode)
+
+    return result

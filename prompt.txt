@@ -1,0 +1,447 @@
+prompt so far:
+
+
+1.Analyze the current project directory.
+
+Do not implement the complete application yet.
+
+Design the architecture for the Image Blur, Sharpening & Edge Detection Studio using:
+
+- Python
+- Tkinter + ttk
+- NumPy
+- Pillow
+- Matplotlib
+- pytest
+
+Create the planned directory structure and explain the responsibility of each module.
+
+The architecture must strictly separate:
+
+1. Signal-processing core
+2. Filter implementations
+3. Image I/O
+4. Analysis
+5. Tkinter GUI
+
+The core must not import Tkinter.
+
+Do not implement the actual filtering algorithms yet.
+
+Create only the minimal project scaffolding required for the next phase.
+
+Verify that the project can be imported without errors.
+
+
+2.Implement the manual 2D discrete convolution engine.
+
+File:
+app/core/convolution.py
+
+Requirements:
+
+1. Accept a 2D grayscale image as a NumPy array.
+
+2. Accept an arbitrary odd-sized 2D kernel:
+   - 3x3
+   - 5x5
+   - 7x7
+   - potentially other odd dimensions
+
+3. Validate:
+   - image is 2D
+   - kernel is 2D
+   - kernel dimensions are odd
+   - kernel is not empty
+   - input dimensions are valid
+
+4. Implement actual mathematical 2D convolution manually using loops.
+
+5. Explicitly flip the kernel before convolution.
+
+6. Support padding modes:
+   - zero
+   - reflect
+   - edge
+
+7. Use floating-point intermediate results.
+
+8. Do NOT use any built-in convolution/filter function.
+
+9. Keep this module completely independent of Tkinter and Pillow.
+
+10. Add comprehensive pytest tests.
+
+Tests must include:
+
+- identity kernel
+- averaging kernel
+- known small matrix
+- kernel flipping
+- zero padding
+- reflect padding
+- edge padding
+- invalid kernel dimensions
+- invalid image dimensions
+- 3x3 kernel
+- 5x5 kernel
+
+Run:
+
+pytest -v
+
+Do not proceed to GUI work.
+
+3.Implement the kernel library.
+
+File:
+app/core/kernels.py
+
+Create functions/constants for:
+
+BLUR:
+- 3x3 box blur
+- 5x5 box blur
+- Gaussian-like 3x3
+- Gaussian-like 5x5
+
+SHARPEN:
+- basic sharpening
+- strong sharpening
+- Laplacian-based sharpening
+
+EDGE:
+- Sobel horizontal
+- Sobel vertical
+- Prewitt horizontal
+- Prewitt vertical
+- Roberts X
+- Roberts Y
+- Laplacian
+
+Requirements:
+
+1. Kernels must be represented using NumPy arrays.
+
+2. Document the mathematical purpose of each kernel.
+
+3. Do not perform convolution here.
+
+4. Add tests verifying:
+   - dimensions
+   - expected coefficients
+   - symmetry where applicable
+   - sum properties where applicable
+
+Run pytest.
+
+Do not modify GUI code.
+
+
+4.Implement the blur filters.
+
+File:
+app/filters/blur.py
+
+Use the manual convolution engine from:
+
+app/core/convolution.py
+
+Implement:
+
+- box blur
+- Gaussian-like blur
+
+Requirements:
+
+1. Never use scipy/OpenCV/PIL filtering functions.
+
+2. Preserve floating-point intermediate results.
+
+3. Provide a clean API that accepts:
+   - image
+   - kernel choice
+   - padding mode
+
+4. Return a NumPy array.
+
+5. Add tests using synthetic images.
+
+6. Verify that blur reduces high-frequency variations.
+
+Run pytest.
+
+Keep the module independent from Tkinter.
+
+
+5.Implement image sharpening.
+
+File:
+app/filters/sharpen.py
+
+Use manual convolution.
+
+Implement:
+
+- basic sharpening
+- strong sharpening
+- Laplacian-based sharpening
+
+Requirements:
+
+1. Use floating-point intermediate arrays.
+
+2. Perform controlled output normalization/clipping.
+
+3. Do not use PIL/OpenCV/scipy filtering.
+
+4. Keep mathematical operations clearly documented.
+
+5. Add tests for:
+   - constant image
+   - simple edge image
+   - impulse image
+   - clipping behavior
+
+Run pytest.
+
+6.Implement edge detection.
+
+File:
+app/filters/edges.py
+
+Implement:
+
+1. Sobel
+   - horizontal
+   - vertical
+   - combined magnitude
+
+2. Prewitt
+   - horizontal
+   - vertical
+   - combined magnitude
+
+3. Roberts
+   - X
+   - Y
+   - combined magnitude
+
+4. Laplacian
+
+For gradient-based operators calculate:
+
+Gx = horizontal response
+Gy = vertical response
+
+Combined magnitude:
+
+G = sqrt(Gx^2 + Gy^2)
+
+Requirements:
+
+- Use manual convolution.
+- Do not use OpenCV/scipy/PIL filtering.
+- Return NumPy arrays.
+- Add tests using synthetic horizontal and vertical edges.
+- Verify that horizontal and vertical responses behave correctly.
+- Test magnitude calculation.
+
+Run pytest.
+
+7.Implement image input/output.
+
+File:
+app/io/image_io.py
+
+Use Pillow.
+
+Implement:
+
+- load_image()
+- convert_to_grayscale()
+- save_image()
+
+Requirements:
+
+1. Support common formats such as:
+   PNG
+   JPG/JPEG
+   BMP
+
+2. Convert loaded images into NumPy arrays for signal processing.
+
+3. Preserve floating-point representation during processing.
+
+4. Convert safely back to uint8 when saving.
+
+5. Do not perform filtering inside this module.
+
+6. Add tests where practical.
+
+The module must remain independent of Tkinter.
+
+8.Now implement the initial GUI using Tkinter + ttk.
+
+Files:
+
+app/main.py
+app/gui/main_window.py
+app/gui/image_view.py
+app/gui/filter_panel.py
+
+Do NOT use PySide6.
+
+Requirements:
+
+1. Create a main Tkinter window.
+
+2. Use ttk widgets where appropriate.
+
+3. Layout should contain:
+
+   LEFT:
+   - controls
+   - image loading button
+   - filter selection
+   - apply button
+   - reset button
+   - save button
+
+   CENTER:
+   - original image
+
+   RIGHT:
+   - processed image
+
+4. Use Pillow ImageTk.PhotoImage to display images inside Tkinter.
+
+5. Maintain references to PhotoImage objects so images do not disappear because of garbage collection.
+
+6. Use filedialog for:
+   - opening images
+   - saving images
+
+7. Use messagebox for errors.
+
+8. Do not put filtering mathematics inside GUI classes.
+
+9. GUI should call the signal-processing modules.
+
+10. Implement:
+    - Load Image
+    - Reset
+    - Save Result
+    - Apply selected filter
+
+11. Initially support only a simple filter selection such as:
+    - Box Blur
+    - Basic Sharpen
+    - Sobel Edge
+
+12. Do not implement the advanced kernel editor yet.
+
+13. Make sure the Tkinter event loop remains responsive.
+
+Run the application and verify:
+
+python run.py
+
+Then run:
+
+pytest -v
+
+9.Implement an interactive kernel editor using Tkinter.
+
+File:
+
+app/gui/kernel_editor.py
+
+Requirements:
+
+1. Support:
+   - 3x3 kernels
+   - 5x5 kernels
+
+2. Display kernel coefficients as editable Tkinter Entry widgets.
+
+3. Allow the user to:
+   - edit coefficients
+   - reset kernel
+   - load a predefined kernel
+   - apply custom kernel
+
+4. Validate that all cells contain valid numerical values.
+
+5. Show clear validation errors.
+
+6. Convert the GUI values into a NumPy array.
+
+7. Send the resulting kernel to the manual convolution engine.
+
+8. The kernel editor must NOT implement convolution itself.
+
+9. Show useful kernel metadata:
+   - size
+   - sum
+   - minimum
+   - maximum
+
+10. Keep the implementation understandable for a university viva.
+
+10.Add a live/custom-kernel preview.
+
+When the user changes a kernel value:
+
+1. Validate the matrix.
+2. Recalculate the preview when possible.
+3. Display the processed preview image.
+
+For responsiveness:
+
+- If the full image is large, create a smaller preview copy.
+- Apply convolution to the preview.
+- Display the preview.
+- When the user presses the final Apply button, process the full-resolution image.
+
+Do not use built-in convolution.
+
+Avoid running expensive full-resolution processing after every keystroke.
+
+Use Tkinter's after() mechanism for controlled updates/debouncing if appropriate.
+
+Do not freeze the GUI.
+
+11.Expand the Tkinter GUI for edge detection.
+
+Add controls for:
+
+Operator:
+- Sobel
+- Prewitt
+- Roberts
+- Laplacian
+
+For Sobel/Prewitt/Roberts provide:
+
+- Horizontal
+- Vertical
+- Combined Magnitude
+
+Display:
+
+- Gx when selected
+- Gy when selected
+- magnitude when selected
+
+For magnitude use:
+
+sqrt(Gx^2 + Gy^2)
+
+Add appropriate normalization for visualization.
+
+Do not modify the underlying mathematical algorithms unless a bug is found.
+
+
+
+
