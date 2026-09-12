@@ -1,14 +1,33 @@
 """
 Sharpening filter implementations.
 
-This module provides spatial domain image sharpening using manual 2D discrete convolution.
-Sharpening works by high-pass filtering (or adding second derivatives / spatial gradients)
-to amplify local differences and enhance high-frequency edge details.
+Provides two sharpening approaches:
+
+1. apply_sharpen() — Kernel-based sharpening via 3x3 high-pass convolution kernels.
+   Works by emphasising center pixel against its neighbors.
+
+2. apply_unsharp_mask() — Unsharp Masking (USM): the industry-standard sharpening technique.
+
+   Mathematical Basis:
+       mask      = Original - GaussianBlur(Original, radius)
+       Output    = Original + amount * mask
+                 = (1 + amount) * Original - amount * GaussianBlur(Original)
+
+   This is a high-pass filter response:
+       - mask captures high-frequency (edge/detail) information only.
+       - Adding a scaled mask back amplifies those details visibly.
+       - Using a larger Gaussian radius (7x7, 9x9) makes the effect
+         clearly visible even on high-resolution (1536x2048+) images.
+
+   Unlike kernel-based sharpening, USM allows independent control of:
+       - radius  : spatial extent of detail extraction (larger = more visible on big images)
+       - amount  : strength of amplification (0.5 = subtle, 1.5 = medium, 3.0 = strong)
 """
 
 import numpy as np
 from src.core.convolution import convolve2d
 from src.core import kernels
+from src.core.kernels import make_gaussian_kernel
 
 
 def apply_sharpen(
@@ -19,34 +38,31 @@ def apply_sharpen(
     clip_range: tuple = (0.0, 255.0),
 ) -> np.ndarray:
     """
-    Apply a sharpening filter to a 2D grayscale image using manual 2D convolution.
+    Apply a kernel-based sharpening filter to a 2D grayscale image.
 
     Mathematical Basis:
-        Sharpening enhances contrast along edges. In spatial domain filtering, 
-        a sharpening operator can be modeled as:
-            Output = Image * K_sharpen
-        where K_sharpen is a high-pass emphasizing kernel whose elements sum to 1.0.
+        Output = Image * K_sharpen
+    where K_sharpen is a high-pass emphasizing kernel (elements sum to 1.0).
 
     Args:
         image (np.ndarray): 2D input grayscale image array.
-        method (str): Sharpening algorithm type. Options are:
-            - 'basic': 3x3 kernel emphasizing 4-connected neighbors.
-            - 'strong': 3x3 kernel emphasizing 8-connected neighbors.
-            - 'laplacian': Laplacian-based isotropic sharpening kernel.
-        padding_mode (str): Padding strategy ('zero', 'reflect', 'edge'). Default 'edge'.
-        clip (bool): Whether to constrain output values within clip_range. Default True.
-        clip_range (tuple): Range (min, max) for clipping output pixel intensities.
+        method (str): Sharpening type:
+            - 'basic'     : 3x3 kernel, 4-connected neighbors (center weight = 5).
+            - 'strong'    : 3x3 kernel, 8-connected neighbors (center weight = 9).
+            - 'laplacian' : Laplacian-based isotropic sharpening kernel.
+        padding_mode (str): Padding strategy ('zero', 'reflect', 'edge').
+        clip (bool): Constrain output to clip_range. Default True.
+        clip_range (tuple): (min, max) intensity range for clipping.
 
     Returns:
-        np.ndarray: Sharpened image as a 2D float64 NumPy array.
+        np.ndarray: Sharpened 2D float64 NumPy array.
 
     Raises:
-        ValueError: If input image is not 2D or an invalid method is specified.
+        ValueError: If image is not 2D or method is unsupported.
     """
     if image.ndim != 2:
         raise ValueError(f"Input image must be a 2D array, got shape {image.shape}")
 
-    # Ensure input is floating point for precision during intermediate calculations
     image_float = image.astype(np.float64)
 
     method_clean = method.lower().strip()
@@ -57,12 +73,86 @@ def apply_sharpen(
     elif method_clean == "laplacian":
         kernel = kernels.SHARPEN_LAPLACIAN
     else:
-        raise ValueError(f"Unsupported sharpening method '{method}'. Choose 'basic', 'strong', or 'laplacian'.")
+        raise ValueError(
+            f"Unsupported sharpening method '{method}'. "
+            f"Choose 'basic', 'strong', or 'laplacian'."
+        )
 
-    # Perform discrete 2D spatial convolution using manual engine
     sharpened = convolve2d(image_float, kernel, padding_mode=padding_mode)
 
-    # Perform controlled output normalization / clipping
+    if clip:
+        min_val, max_val = clip_range
+        sharpened = np.clip(sharpened, min_val, max_val)
+
+    return sharpened
+
+
+def apply_unsharp_mask(
+    image: np.ndarray,
+    radius: int = 5,
+    amount: float = 1.5,
+    padding_mode: str = "edge",
+    clip: bool = True,
+    clip_range: tuple = (0.0, 255.0),
+) -> np.ndarray:
+    """
+    Apply Unsharp Masking (USM) to a 2D grayscale image.
+
+    Algorithm:
+        1. Blur the image using a Gaussian kernel of given radius.
+        2. Compute mask (high-frequency detail):
+               mask = original - blurred
+        3. Amplify and add back:
+               output = original + amount * mask
+                      = (1 + amount) * original - amount * blurred
+
+    This technique is clearly visible on high-resolution images because the
+    radius controls how large a neighborhood is used for detail extraction.
+
+    Args:
+        image (np.ndarray): 2D input grayscale image array (float64 or uint8).
+        radius (int): Gaussian blur kernel size. Must be odd (3, 5, 7, 9, 11).
+                      Larger radius = stronger, more visible sharpening effect
+                      on large images. Recommended: 5–9 for 1080p+ images.
+        amount (float): Sharpening strength multiplier.
+                        - 0.5  : subtle
+                        - 1.0  : moderate
+                        - 1.5  : visible (default)
+                        - 2.5+ : aggressive / oversharpened
+        padding_mode (str): Padding strategy for convolution ('zero', 'reflect', 'edge').
+        clip (bool): Constrain output to clip_range. Default True.
+        clip_range (tuple): (min, max) intensity values for output clipping.
+
+    Returns:
+        np.ndarray: Sharpened image as 2D float64 NumPy array.
+
+    Raises:
+        ValueError: If image is not 2D, radius is even, or amount is non-positive.
+    """
+    if image.ndim != 2:
+        raise ValueError(f"Input image must be a 2D array, got shape {image.shape}")
+
+    if radius < 3 or radius % 2 == 0:
+        raise ValueError(f"radius must be an odd integer >= 3, got {radius}.")
+
+    if amount <= 0:
+        raise ValueError(f"amount must be a positive number, got {amount}.")
+
+    image_float = image.astype(np.float64)
+
+    # Step 1: Blur using programmatic Gaussian kernel
+    gauss_kernel = make_gaussian_kernel(radius)
+    blurred = convolve2d(image_float, gauss_kernel, padding_mode=padding_mode)
+
+    # Step 2: Compute high-frequency detail mask
+    #   mask = original - blurred   (isolates edges and fine detail)
+    mask = image_float - blurred
+
+    # Step 3: Add amplified mask back to original
+    #   output = original + amount * mask
+    sharpened = image_float + amount * mask
+
+    # Step 4: Clip to valid range
     if clip:
         min_val, max_val = clip_range
         sharpened = np.clip(sharpened, min_val, max_val)

@@ -6,8 +6,9 @@ from src.filters.blur import apply_blur
 def test_blur_invalid_args():
     """Verify that unsupported parameters raise ValueErrors."""
     image = np.ones((10, 10))
+    # size=4 is even — never supported (must be one of 3, 5, 7, 9)
     with pytest.raises(ValueError, match="Unsupported size"):
-        apply_blur(image, blur_type='box', size=7)
+        apply_blur(image, blur_type='box', size=4)
     with pytest.raises(ValueError, match="Unsupported blur_type"):
         apply_blur(image, blur_type='magic')
 
