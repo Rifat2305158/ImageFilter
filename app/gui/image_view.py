@@ -113,9 +113,10 @@ class ImageView(ttk.LabelFrame):
         # Resize image maintaining aspect ratio
         pil_img.thumbnail(target_size, Image.Resampling.LANCZOS)
 
-        # Retain PhotoImage reference
-        photo = ImageTk.PhotoImage(pil_img)
+        # Retain PhotoImage reference bound to self master
+        photo = ImageTk.PhotoImage(pil_img, master=self)
         self._photo_image = photo
+
 
         # Update label display
         self.image_label.config(image=photo, text="")

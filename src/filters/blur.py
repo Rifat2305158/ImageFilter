@@ -45,6 +45,12 @@ def apply_blur(
     Raises:
         ValueError: If blur_type or size is unsupported.
     """
+    if not isinstance(image, np.ndarray):
+        raise TypeError("Input image must be a NumPy array.")
+
+    if image.ndim not in (2, 3):
+        raise ValueError(f"Input image must be a 2D or 3D RGB array, got shape {image.shape}")
+
     if blur_type == 'box':
         kernel_map = _BOX_KERNEL_MAP
     elif blur_type == 'gaussian':
@@ -65,3 +71,4 @@ def apply_blur(
         result = convolve2d(result, kernel, padding_mode=padding_mode)
 
     return result
+

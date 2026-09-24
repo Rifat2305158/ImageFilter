@@ -16,18 +16,21 @@ from PIL import Image
 
 def load_image(
     filepath: Union[str, Path], 
-    as_grayscale: bool = True
+    as_grayscale: bool = False
 ) -> np.ndarray:
     """
     Load an image from disk using Pillow and convert to a float64 NumPy array.
 
+    Preserves the native color mode of the image (grayscale as (H, W) 2D array,
+    RGB/RGBA as (H, W, 3) 3D array) unless as_grayscale=True is explicitly set.
+
     Args:
         filepath (str | Path): Path to the image file (PNG, JPG, BMP, etc.).
         as_grayscale (bool): If True, converts image to 2D grayscale array.
-                             Default is True.
+                             Default is False.
 
     Returns:
-        np.ndarray: 2D or 3D float64 NumPy array.
+        np.ndarray: 2D (H, W) or 3D (H, W, 3) float64 NumPy array.
 
     Raises:
         FileNotFoundError: If the specified file path does not exist.
@@ -45,6 +48,10 @@ def load_image(
 
     if as_grayscale:
         return convert_to_grayscale(img_copy)
+
+    if img_copy.mode in ('L', '1', 'LA'):
+        gray_pil = img_copy.convert('L')
+        return np.asarray(gray_pil, dtype=np.float64)
     else:
         if img_copy.mode != 'RGB':
             img_copy = img_copy.convert('RGB')

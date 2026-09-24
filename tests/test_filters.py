@@ -47,3 +47,34 @@ def test_blur_reduces_high_frequency():
     blurred_box_5 = apply_blur(image, blur_type='box', size=5, padding_mode='edge')
     box_5_variance = np.var(blurred_box_5)
     assert box_5_variance < box_variance
+
+
+def test_rgb_blur_constant_image():
+    """Verify that a constant RGB image remains constant under normalized blur."""
+    rgb_image = np.ones((8, 8, 3), dtype=np.float64)
+    rgb_image[:, :, 0] *= 50.0
+    rgb_image[:, :, 1] *= 100.0
+    rgb_image[:, :, 2] *= 150.0
+
+    blurred = apply_blur(rgb_image, blur_type='gaussian', size=5, padding_mode='edge')
+    assert blurred.shape == (8, 8, 3)
+    np.testing.assert_array_almost_equal(blurred, rgb_image)
+
+
+def test_rgb_blur_channel_changes():
+    """Verify that RGB blur smoothes noise independently on each channel."""
+    np.random.seed(42)
+    noise = np.random.randint(-30, 30, (16, 16, 3)).astype(np.float64)
+    rgb_image = np.ones((16, 16, 3), dtype=np.float64) * 128.0 + noise
+
+    orig_var_r = np.var(rgb_image[:, :, 0])
+    orig_var_g = np.var(rgb_image[:, :, 1])
+    orig_var_b = np.var(rgb_image[:, :, 2])
+
+    blurred = apply_blur(rgb_image, blur_type='box', size=3, padding_mode='edge')
+    assert blurred.shape == (16, 16, 3)
+
+    assert np.var(blurred[:, :, 0]) < orig_var_r
+    assert np.var(blurred[:, :, 1]) < orig_var_g
+    assert np.var(blurred[:, :, 2]) < orig_var_b
+

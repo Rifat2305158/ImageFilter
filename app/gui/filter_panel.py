@@ -143,6 +143,16 @@ class FilterPanel(ttk.LabelFrame):
         )
         self.chk_norm.grid(row=2, column=0, columnspan=2, sticky="w", pady=(4, 0))
 
+        # Educational note: RGB images are luma-converted before edge detection
+        self.lbl_edge_rgb_note = ttk.Label(
+            self.edge_frame,
+            text="⚠ RGB input: converted to grayscale\n   Y = 0.299R + 0.587G + 0.114B",
+            font=("Segoe UI", 8, "italic"),
+            foreground="#666666",
+            justify="left"
+        )
+        self.lbl_edge_rgb_note.grid(row=3, column=0, columnspan=2, sticky="w", pady=(6, 0))
+
         # Initially hidden (shown when 'Edge Detection' selected)
         self.edge_frame_row = row
         row += 1

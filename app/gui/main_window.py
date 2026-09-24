@@ -6,23 +6,29 @@ and AnalysisPanel via a ttk.Notebook tabbed layout.
 """
 
 import time
+import threading
 from pathlib import Path
 import tkinter as tk
 from tkinter import ttk, filedialog, messagebox
-from typing import Optional
+from typing import Optional, Callable
 import numpy as np
 
 from app.gui.header import Header
 from app.gui.status_bar import StatusBar
 from app.gui.image_view import ImageView
+from app.gui.image_area import ImageArea
 from app.gui.filter_panel import FilterPanel
 from app.gui.kernel_editor import KernelEditorWindow
 from app.gui.analysis_panel import AnalysisPanel
+from app.gui.kernel_info import KernelInfoPanel
+from app.gui.filter_comparison import FilterComparisonPanel
+
 from app.io.image_io import load_image, save_image
 from app.filters.blur import apply_blur
 from app.filters.sharpen import apply_sharpen, apply_unsharp_mask
 from app.filters.edges import apply_edge
-from src.core.convolution import convolve2d
+from app.core.convolution import convolve2d
+
 
 
 def _parse_kernel_size(filter_name: str, default: int = 3) -> int:
@@ -118,26 +124,36 @@ class MainWindow(tk.Tk):
         # 3b. Signal Analysis Tab
         self._build_analysis_tab()
 
+        # 3c. Educational Kernel Info Tab
+        self._build_kernel_info_tab()
+
+        # 3d. Multi-Filter Comparison Tab
+        self._build_filter_comparison_tab()
+
         # 4. StatusBar
         self.status_bar = StatusBar(self)
         self.status_bar.grid(row=2, column=0, columnspan=2, sticky="ew")
 
     def _build_images_tab(self) -> None:
-        """Build the dual image view tab inside the Notebook."""
+        """Build the dual image view & comparison tab inside the Notebook."""
         images_tab = ttk.Frame(self.notebook)
-        self.notebook.add(images_tab, text="  🖼  Images  ")
+        self.notebook.add(images_tab, text="  🖼  Images & Comparison  ")
 
-        images_tab.columnconfigure(0, weight=1)  # Original Frame
-        images_tab.columnconfigure(1, weight=1)  # Processed Frame
+        images_tab.columnconfigure(0, weight=1)
         images_tab.rowconfigure(0, weight=1)
 
-        # Original View
-        self.original_view = ImageView(images_tab, title="Original Image")
-        self.original_view.grid(row=0, column=0, sticky="nsew", padx=(0, 5), pady=5)
+        self.image_area = ImageArea(images_tab)
+        self.image_area.grid(row=0, column=0, sticky="nsew")
 
-        # Processed View
-        self.processed_view = ImageView(images_tab, title="Processed Result")
-        self.processed_view.grid(row=0, column=1, sticky="nsew", padx=(5, 0), pady=5)
+    @property
+    def original_view(self) -> ImageView:
+        """Alias for backward compatibility with original_view property."""
+        return self.image_area.original_frame
+
+    @property
+    def processed_view(self) -> ImageView:
+        """Alias for backward compatibility with processed_view property."""
+        return self.image_area.processed_frame
 
     def _build_analysis_tab(self) -> None:
         """Build the Signal Analysis panel tab inside the Notebook."""
@@ -150,7 +166,30 @@ class MainWindow(tk.Tk):
         self.analysis_panel = AnalysisPanel(analysis_tab)
         self.analysis_panel.grid(row=0, column=0, sticky="nsew")
 
+    def _build_kernel_info_tab(self) -> None:
+        """Build the Educational Kernel Information tab inside the Notebook."""
+        info_tab = ttk.Frame(self.notebook)
+        self.notebook.add(info_tab, text="  📚  Educational Kernel Info  ")
+
+        info_tab.columnconfigure(0, weight=1)
+        info_tab.rowconfigure(0, weight=1)
+
+        self.kernel_info_panel = KernelInfoPanel(info_tab)
+        self.kernel_info_panel.grid(row=0, column=0, sticky="nsew")
+
+    def _build_filter_comparison_tab(self) -> None:
+        """Build the Multi-Filter Comparison tab inside the Notebook."""
+        comp_tab = ttk.Frame(self.notebook)
+        self.notebook.add(comp_tab, text="  ⚔  Filter Comparison  ")
+
+        comp_tab.columnconfigure(0, weight=1)
+        comp_tab.rowconfigure(0, weight=1)
+
+        self.filter_comp_panel = FilterComparisonPanel(comp_tab)
+        self.filter_comp_panel.grid(row=0, column=0, sticky="nsew")
+
     # ------------------------------------------------------------------
+
     # Event Handlers
     # ------------------------------------------------------------------
 
@@ -184,22 +223,25 @@ class MainWindow(tk.Tk):
 
         try:
             t0 = time.perf_counter()
-            image_array = load_image(file_path, as_grayscale=True)
+            image_array = load_image(file_path)
             elapsed = time.perf_counter() - t0
 
             self.original_image = image_array
             self.processed_image = image_array.copy()
 
-            self.original_view.set_image(self.original_image)
-            self.processed_view.set_image(self.processed_image)
+            self.image_area.set_images(self.original_image, self.processed_image)
+            self.filter_comp_panel.set_image(self.original_image)
 
             # Update analysis with initial (identical) original & processed
             self.analysis_panel.update_analysis(self.original_image, self.processed_image)
 
+
+
             filename = Path(file_path).name
             h, w = image_array.shape[:2]
+            mode_str = "Grayscale" if image_array.ndim == 2 else "RGB"
             self.status_bar.set_status(f"Loaded '{filename}' in {elapsed:.3f}s")
-            self.status_bar.set_info(f"Dimensions: {w} × {h} | Mode: Grayscale")
+            self.status_bar.set_info(f"Dimensions: {w} × {h} | Mode: {mode_str}")
 
         except Exception as e:
             messagebox.showerror("Error Loading Image", f"Failed to load image:\n{e}")
@@ -211,22 +253,22 @@ class MainWindow(tk.Tk):
             messagebox.showwarning("No Image Loaded", "Please load an image before applying a filter.")
             return
 
-        try:
-            if filter_name == "Custom Kernel (Editor)":
-                self.handle_open_kernel_editor()
-                return
+        if filter_name == "Custom Kernel (Editor)":
+            self.handle_open_kernel_editor()
+            return
 
-            self.status_bar.set_status(f"Applying '{filter_name}'...")
-            self.update_idletasks()
+        # Update educational kernel info tab
+        self.kernel_info_panel.display_kernel_info(filter_name)
 
-            t0 = time.perf_counter()
+        self.status_bar.set_status(f"Applying '{filter_name}'...")
+        self.update_idletasks()
+
+        def compute() -> tuple[np.ndarray, str]:
             desc_str = filter_name
             iterations = self.control_panel.get_iterations()
-
             fn_lower = filter_name.lower()
 
             if fn_lower.startswith("box blur"):
-                # Parse size from label e.g. "Box Blur (7x7)" → 7
                 size = _parse_kernel_size(filter_name, default=3)
                 result = apply_blur(
                     self.original_image,
@@ -250,7 +292,6 @@ class MainWindow(tk.Tk):
                     method='basic',
                     padding_mode='edge',
                 )
-                # Apply iterations manually for sharpen
                 for _ in range(iterations - 1):
                     result = apply_sharpen(result, method='basic', padding_mode='edge')
             elif filter_name == "Strong Sharpen":
@@ -262,13 +303,11 @@ class MainWindow(tk.Tk):
                 for _ in range(iterations - 1):
                     result = apply_sharpen(result, method='strong', padding_mode='edge')
             elif filter_name.startswith("Unsharp Mask"):
-                # Parse preset parameters from label, e.g. "Unsharp Mask — Medium (r=7, a=1.5)"
                 import re as _re
                 r_match = _re.search(r'r=([0-9]+)', filter_name)
                 a_match = _re.search(r'a=([0-9.]+)', filter_name)
                 usm_radius = int(r_match.group(1)) if r_match else 5
                 usm_amount = float(a_match.group(1)) if a_match else 1.5
-                # Scale amount by iterations for progressive strengthening
                 usm_amount_total = usm_amount * iterations
                 result = apply_unsharp_mask(
                     self.original_image,
@@ -291,30 +330,23 @@ class MainWindow(tk.Tk):
                 )
 
                 if normalize:
-                    # Normalize signed gradients (Gx, Gy, Laplacian) for visual clarity
                     if direction in ("horizontal", "vertical") or op == "laplacian":
                         result = np.abs(result)
                     max_val = np.max(result)
                     if max_val > 0:
                         result = (result / max_val) * 255.0
 
-                desc_str = f"{op.capitalize()} Edge ({direction.capitalize()})"
+                base_desc = f"{op.capitalize()} Edge ({direction.capitalize()})"
+                if self.original_image.ndim == 3:
+                    desc_str = f"{base_desc} [RGB→Grayscale luma]"
+                else:
+                    desc_str = base_desc
             else:
                 raise ValueError(f"Unknown filter option '{filter_name}'.")
 
-            elapsed = time.perf_counter() - t0
+            return result, desc_str
 
-            self.processed_image = result
-            self.processed_view.set_image(self.processed_image)
-
-            # Refresh analysis panel with updated arrays
-            self.analysis_panel.update_analysis(self.original_image, self.processed_image)
-
-            self.status_bar.set_status(f"Applied {desc_str} in {elapsed:.3f}s")
-
-        except Exception as e:
-            messagebox.showerror("Filter Error", f"An error occurred while applying filter:\n{e}")
-            self.status_bar.set_status("Error applying filter.")
+        self._execute_filter_computation(compute)
 
     def handle_apply_custom_kernel(self, kernel_matrix: np.ndarray) -> None:
         """Apply custom user-designed matrix kernel using manual convolve2d engine."""
@@ -322,26 +354,54 @@ class MainWindow(tk.Tk):
             messagebox.showwarning("No Image Loaded", "Please load an image before applying custom kernel.")
             return
 
-        try:
-            k_h, k_w = kernel_matrix.shape
-            self.status_bar.set_status(f"Applying custom {k_h}x{k_w} kernel...")
-            self.update_idletasks()
+        k_h, k_w = kernel_matrix.shape
+        self.kernel_info_panel.display_kernel_info(f"Custom Kernel ({k_h}x{k_w})", custom_matrix=kernel_matrix)
 
-            t0 = time.perf_counter()
-            result = convolve2d(self.original_image, kernel_matrix, padding_mode='edge')
-            elapsed = time.perf_counter() - t0
+        self.status_bar.set_status(f"Applying custom {k_h}x{k_w} kernel...")
+        self.update_idletasks()
 
-            self.processed_image = result
-            self.processed_view.set_image(self.processed_image)
+        def compute() -> tuple[np.ndarray, str]:
+            res = convolve2d(self.original_image, kernel_matrix, padding_mode='edge')
+            return res, f"Custom {k_h}x{k_w} Kernel"
 
-            # Refresh analysis panel
-            self.analysis_panel.update_analysis(self.original_image, self.processed_image)
+        self._execute_filter_computation(compute)
 
-            self.status_bar.set_status(f"Applied custom {k_h}x{k_w} kernel in {elapsed:.3f}s")
+    def _execute_filter_computation(self, compute_fn: Callable[[], tuple[np.ndarray, str]]) -> None:
+        """Execute filter computation in worker thread to prevent Tkinter GUI freeze."""
+        t0 = time.perf_counter()
 
-        except Exception as e:
-            messagebox.showerror("Convolution Error", f"Failed to apply custom kernel:\n{e}")
-            self.status_bar.set_status("Error applying custom kernel.")
+        def worker():
+            try:
+                result, desc_str = compute_fn()
+                elapsed = time.perf_counter() - t0
+                self.after(0, self._on_filter_success, result, desc_str, elapsed)
+            except Exception as err:
+                self.after(0, self._on_filter_error, str(err))
+
+        thread = threading.Thread(target=worker, daemon=True)
+        thread.start()
+
+    def _on_filter_success(self, result: np.ndarray, desc_str: str, elapsed: float) -> None:
+        """Main thread callback executed after background convolution completes."""
+        self.processed_image = result
+        self.image_area.set_images(self.original_image, self.processed_image)
+        self.analysis_panel.update_analysis(self.original_image, self.processed_image)
+        self.status_bar.set_status(f"Applied {desc_str} in {elapsed:.3f}s")
+
+        # Update info bar: show original mode + processed shape
+        orig_mode = "RGB" if (self.original_image is not None and self.original_image.ndim == 3) else "Grayscale"
+        proc_mode = "RGB" if result.ndim == 3 else "Grayscale"
+        h, w = result.shape[:2]
+        if orig_mode == proc_mode:
+            self.status_bar.set_info(f"Image: {orig_mode} | Size: {w} × {h}")
+        else:
+            self.status_bar.set_info(f"Input: {orig_mode} → Output: {proc_mode} | Size: {w} × {h}")
+
+    def _on_filter_error(self, err_msg: str) -> None:
+        """Main thread callback executed if background convolution fails."""
+        messagebox.showerror("Filter Error", f"An error occurred while applying filter:\n{err_msg}")
+        self.status_bar.set_status("Error applying filter.")
+
 
     def handle_reset(self) -> None:
         """Reset processed result back to original loaded image."""
@@ -349,7 +409,7 @@ class MainWindow(tk.Tk):
             return
 
         self.processed_image = self.original_image.copy()
-        self.processed_view.set_image(self.processed_image)
+        self.image_area.set_images(self.original_image, self.processed_image)
 
         # Refresh analysis panel after reset (orig == processed again)
         self.analysis_panel.update_analysis(self.original_image, self.processed_image)

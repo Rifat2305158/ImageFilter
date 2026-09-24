@@ -145,3 +145,96 @@ def test_io_error_handling(tmp_path):
 
     with pytest.raises(TypeError, match="must be a PIL Image or NumPy array"):
         convert_to_grayscale(12345)
+
+
+def test_load_grayscale_image_preserves_shape(tmp_path):
+    """Loading a grayscale file produces a NumPy array with shape (H, W)."""
+    file_path = tmp_path / "gray.png"
+    img_pil = Image.new("L", (8, 6), color=128)  # W=8, H=6
+    img_pil.save(file_path)
+
+    loaded = load_image(file_path)
+    assert loaded.ndim == 2
+    assert loaded.shape == (6, 8)
+    assert loaded.dtype == np.float64
+    np.testing.assert_array_equal(loaded, 128.0)
+
+
+def test_load_rgb_image_preserves_shape(tmp_path):
+    """Loading an RGB file produces a NumPy array with shape (H, W, 3)."""
+    file_path = tmp_path / "rgb.png"
+    img_pil = Image.new("RGB", (8, 6), color=(255, 128, 64))  # W=8, H=6
+    img_pil.save(file_path)
+
+    loaded = load_image(file_path)
+    assert loaded.ndim == 3
+    assert loaded.shape == (6, 8, 3)
+    assert loaded.dtype == np.float64
+    np.testing.assert_array_equal(loaded[:, :, 0], 255.0)
+    np.testing.assert_array_equal(loaded[:, :, 1], 128.0)
+    np.testing.assert_array_equal(loaded[:, :, 2], 64.0)
+
+
+def test_load_rgba_image_converts_to_rgb(tmp_path):
+    """Loading an RGBA image converts it to RGB shape (H, W, 3)."""
+    file_path = tmp_path / "rgba.png"
+    img_pil = Image.new("RGBA", (10, 10), color=(100, 150, 200, 255))
+    img_pil.save(file_path)
+
+    loaded = load_image(file_path)
+    assert loaded.ndim == 3
+    assert loaded.shape == (10, 10, 3)
+    assert loaded.dtype == np.float64
+
+
+def test_save_and_load_rgb_output(tmp_path):
+    """Saving 3D RGB float64 array saves valid RGB image and reloads as RGB."""
+    file_path = tmp_path / "saved_rgb.png"
+    rgb_arr = np.zeros((4, 5, 3), dtype=np.float64)
+    rgb_arr[:, :, 0] = 200.0  # R
+    rgb_arr[:, :, 1] = 100.0  # G
+    rgb_arr[:, :, 2] = 50.0   # B
+
+    save_image(file_path, rgb_arr)
+    assert file_path.exists()
+
+    loaded = load_image(file_path)
+    assert loaded.shape == (4, 5, 3)
+    np.testing.assert_array_equal(loaded[:, :, 0], 200.0)
+    np.testing.assert_array_equal(loaded[:, :, 1], 100.0)
+    np.testing.assert_array_equal(loaded[:, :, 2], 50.0)
+
+    # Verify PIL image mode on disk is RGB
+    with Image.open(file_path) as disk_img:
+        assert disk_img.mode == "RGB"
+
+
+def test_save_and_load_grayscale_output(tmp_path):
+    """Saving 2D float64 array saves valid grayscale image ('L') and reloads as grayscale."""
+    file_path = tmp_path / "saved_gray.png"
+    gray_arr = np.full((4, 5), 180.0, dtype=np.float64)
+
+    save_image(file_path, gray_arr)
+    assert file_path.exists()
+
+    loaded = load_image(file_path)
+    assert loaded.shape == (4, 5)
+    assert loaded.ndim == 2
+    np.testing.assert_array_equal(loaded, 180.0)
+
+    # Verify PIL image mode on disk is L
+    with Image.open(file_path) as disk_img:
+        assert disk_img.mode == "L"
+
+
+def test_load_image_explicit_as_grayscale_flag(tmp_path):
+    """Explicitly passing as_grayscale=True converts RGB file to 2D grayscale."""
+    file_path = tmp_path / "rgb_to_gray.png"
+    img_pil = Image.new("RGB", (10, 10), color=(255, 0, 0))
+    img_pil.save(file_path)
+
+    loaded = load_image(file_path, as_grayscale=True)
+    assert loaded.ndim == 2
+    assert loaded.shape == (10, 10)
+    np.testing.assert_allclose(loaded, 76.0, atol=1.0)
+

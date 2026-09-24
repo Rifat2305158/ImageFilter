@@ -22,12 +22,38 @@ from src.core import kernels
 
 
 def _validate_2d_image(image: np.ndarray) -> np.ndarray:
-    """Validate that input image is a 2D numpy array and convert to float64."""
+    """
+    Validate input image and convert to 2D float64 grayscale array.
+
+    If input is 2D (H, W), converts to float64 directly.
+    If input is 3D RGB (H, W, 3), converts to 2D grayscale using standard luma formula:
+        Y = 0.299 * R + 0.587 * G + 0.114 * B
+    prior to edge detection convolution.
+
+    Args:
+        image (np.ndarray): 2D array or 3D RGB array.
+
+    Returns:
+        np.ndarray: 2D float64 grayscale NumPy array.
+
+    Raises:
+        TypeError: If image is not a NumPy array.
+        ValueError: If image dimensions or channel count are invalid.
+    """
     if not isinstance(image, np.ndarray):
         raise TypeError("Input image must be a numpy array.")
-    if image.ndim != 2:
-        raise ValueError(f"Input image must be a 2D array, got shape {image.shape}.")
-    return image.astype(np.float64)
+
+    if image.ndim == 2:
+        return image.astype(np.float64)
+    elif image.ndim == 3:
+        if image.shape[2] != 3:
+            raise ValueError(f"3D RGB image must have 3 channels, got shape {image.shape}.")
+        arr = image.astype(np.float64)
+        r, g, b = arr[:, :, 0], arr[:, :, 1], arr[:, :, 2]
+        return 0.299 * r + 0.587 * g + 0.114 * b
+    else:
+        raise ValueError(f"Input image must be a 2D array or 3D RGB array, got shape {image.shape}.")
+
 
 
 def apply_sobel(
