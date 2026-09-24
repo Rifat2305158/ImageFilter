@@ -191,8 +191,38 @@ def test_edge_detection_input_validation():
     with pytest.raises(ValueError, match="Unsupported edge operator"):
         apply_edge(img, operator='canny')
 
-    with pytest.raises(ValueError, match="Input image must be a 2D array"):
-        apply_sobel(np.ones((5, 5, 3)))
+    with pytest.raises(ValueError, match="3D RGB image must have 3 channels|Input image must be a 2D array"):
+        apply_sobel(np.ones((5, 5, 4)))
 
     with pytest.raises(TypeError, match="Input image must be a numpy array"):
         apply_sobel([[1, 2], [3, 4]])
+
+
+def test_rgb_edge_detection_accepted():
+    """Verify that 3D RGB array input is accepted and returns 2D grayscale edge map."""
+    rgb_img = np.random.uniform(0.0, 255.0, (10, 10, 3)).astype(np.float64)
+    res_sobel = apply_sobel(rgb_img, direction='combined')
+    res_prewitt = apply_prewitt(rgb_img, direction='combined')
+    res_roberts = apply_roberts(rgb_img, direction='combined')
+    res_laplacian = apply_laplacian(rgb_img)
+
+    assert res_sobel.shape == (10, 10)
+    assert res_prewitt.shape == (10, 10)
+    assert res_roberts.shape == (10, 10)
+    assert res_laplacian.shape == (10, 10)
+
+
+def test_rgb_luma_conversion_and_synthetic_edge():
+    """Verify that synthetic RGB step edge converts to luma and detects edge response."""
+    rgb_edge = np.zeros((10, 10, 3), dtype=np.float64)
+    rgb_edge[:, 5:, 0] = 100.0  # Step edge on Red channel (0.299 * 100 = 29.9 luma step)
+
+    gx = apply_sobel(rgb_edge, direction='horizontal', padding_mode='edge')
+    gy = apply_sobel(rgb_edge, direction='vertical', padding_mode='edge')
+    g_comb = apply_sobel(rgb_edge, direction='combined', padding_mode='edge')
+
+    # Horizontal gradient must detect vertical edge
+    assert np.any(np.abs(gx) > 0.0), "RGB Sobel Gx failed to detect vertical edge after luma conversion."
+    np.testing.assert_array_almost_equal(gy, 0.0, err_msg="RGB Sobel Gy gave false response on vertical edge.")
+    assert np.all(g_comb >= 0.0)
+

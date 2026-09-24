@@ -3,6 +3,8 @@ Signal Analysis & Histogram Visualization Panel.
 
 Embeds Matplotlib charts inside Tkinter using FigureCanvasTkAgg and displays
 side-by-side numerical signal & edge statistics.
+
+Supports both 2D grayscale (H, W) and 3D RGB (H, W, 3) image arrays.
 """
 
 import tkinter as tk
@@ -70,6 +72,14 @@ class AnalysisPanel(ttk.Frame):
 
             self.stat_rows[key] = (orig_lbl, proc_lbl)
 
+        # Mode label row (Grayscale / RGB)
+        ttk.Separator(stats_frame, orient=tk.HORIZONTAL).grid(row=9, column=0, columnspan=3, sticky="ew", pady=5)
+        ttk.Label(stats_frame, text="Image Mode", font=("Segoe UI", 9, "bold")).grid(row=10, column=0, sticky="w", pady=2)
+        self.lbl_orig_mode = ttk.Label(stats_frame, text="-", font=("Consolas", 9), anchor="e")
+        self.lbl_orig_mode.grid(row=10, column=1, sticky="e", pady=2)
+        self.lbl_proc_mode = ttk.Label(stats_frame, text="-", font=("Consolas", 9), anchor="e")
+        self.lbl_proc_mode.grid(row=10, column=2, sticky="e", pady=2)
+
         # 2. Right Matplotlib Canvas Frame
         plot_frame = ttk.LabelFrame(self, text="Histogram Visualization (256 Bins)", padding=5)
         plot_frame.grid(row=0, column=1, sticky="nsew")
@@ -99,6 +109,8 @@ class AnalysisPanel(ttk.Frame):
         """
         Recalculate signal statistics and update embedded Matplotlib histogram plots.
 
+        Supports both 2D grayscale (H, W) and 3D RGB (H, W, 3) arrays.
+
         Args:
             orig_img (np.ndarray | None): Original image array.
             proc_img (np.ndarray | None): Processed image array.
@@ -123,6 +135,15 @@ class AnalysisPanel(ttk.Frame):
             else:
                 proc_lbl.config(text="-")
 
+        # Update mode labels
+        def _mode_str(arr):
+            if arr is None:
+                return "-"
+            return "RGB" if arr.ndim == 3 else "Grayscale"
+
+        self.lbl_orig_mode.config(text=_mode_str(orig_img))
+        self.lbl_proc_mode.config(text=_mode_str(proc_img))
+
         # 2. Update Matplotlib Subplots
         self.ax_orig.clear()
         self.ax_proc.clear()
@@ -136,32 +157,64 @@ class AnalysisPanel(ttk.Frame):
 
         # Original Histogram
         if orig_img is not None:
-            counts_orig, _ = calculate_histogram(orig_img)
-            self.ax_orig.bar(centers, counts_orig, color="#2B5B84", width=1.0, alpha=0.8)
-            self.ax_orig.set_title("Original Image Histogram", fontsize=9, fontweight="bold")
-            self.ax_orig.set_xlim(0, 255)
-            self.ax_orig.grid(True, linestyle=":", alpha=0.5)
-
-            self.ax_comp.plot(centers, counts_orig, color="#2B5B84", label="Original", linewidth=1.5)
+            self._plot_histogram(self.ax_orig, orig_img, "Original Image Histogram")
+            self._plot_comparison_lines(self.ax_comp, orig_img, label_prefix="Orig",
+                                        colors=("#2B5B84", "#1A7A4A", "#B06020"))
 
         # Processed Histogram
         if proc_img is not None:
-            counts_proc, _ = calculate_histogram(proc_img)
-            self.ax_proc.bar(centers, counts_proc, color="#D9534F", width=1.0, alpha=0.8)
-            self.ax_proc.set_title("Processed Image Histogram", fontsize=9, fontweight="bold")
-            self.ax_proc.set_xlim(0, 255)
-            self.ax_proc.grid(True, linestyle=":", alpha=0.5)
-
-            self.ax_comp.plot(centers, counts_proc, color="#D9534F", label="Processed", linewidth=1.5, linestyle="--")
+            self._plot_histogram(self.ax_proc, proc_img, "Processed Image Histogram")
+            self._plot_comparison_lines(self.ax_comp, proc_img, label_prefix="Proc",
+                                        colors=("#D9534F", "#E8A020", "#9B59B6"),
+                                        linestyle="--")
 
         # Comparison Overlay
         self.ax_comp.set_title("Side-by-Side Histogram Comparison", fontsize=9, fontweight="bold")
         self.ax_comp.set_xlim(0, 255)
         self.ax_comp.grid(True, linestyle=":", alpha=0.5)
-        self.ax_comp.legend(loc="upper right", fontsize=8)
+        if orig_img is not None or proc_img is not None:
+            self.ax_comp.legend(loc="upper right", fontsize=7)
 
         self.figure.tight_layout(pad=2.0)
         self.canvas.draw()
+
+    def _plot_histogram(self, ax, img: np.ndarray, title: str) -> None:
+        """Plot a histogram on the given axis. Handles both grayscale and RGB arrays."""
+        ax.set_title(title, fontsize=9, fontweight="bold")
+        ax.set_xlim(0, 255)
+        ax.grid(True, linestyle=":", alpha=0.5)
+
+        if img.ndim == 3 and img.shape[2] == 3:
+            # Per-channel RGB histograms overlaid
+            channel_colors = [("#D9534F", "R"), ("#2DB85A", "G"), ("#3B90E0", "B")]
+            for ch_idx, (color, ch_label) in enumerate(channel_colors):
+                counts, _ = calculate_histogram(img[:, :, ch_idx])
+                centers = np.arange(256)
+                ax.plot(centers, counts, color=color, linewidth=1.0, alpha=0.8, label=ch_label)
+            ax.legend(loc="upper right", fontsize=7)
+        else:
+            counts, _ = calculate_histogram(img)
+            centers = np.arange(256)
+            ax.bar(centers, counts, color="#2B5B84", width=1.0, alpha=0.8)
+
+    def _plot_comparison_lines(
+        self, ax, img: np.ndarray,
+        label_prefix: str,
+        colors: tuple,
+        linestyle: str = "-"
+    ) -> None:
+        """Plot comparison lines on the comparison axis. Handles both grayscale and RGB."""
+        centers = np.arange(256)
+        if img.ndim == 3 and img.shape[2] == 3:
+            ch_labels = ("R", "G", "B")
+            for ch_idx, (color, ch_label) in enumerate(zip(colors, ch_labels)):
+                counts, _ = calculate_histogram(img[:, :, ch_idx])
+                ax.plot(centers, counts, color=color, label=f"{label_prefix}-{ch_label}",
+                        linewidth=1.2, linestyle=linestyle, alpha=0.8)
+        else:
+            counts, _ = calculate_histogram(img)
+            ax.plot(centers, counts, color=colors[0], label=label_prefix,
+                    linewidth=1.5, linestyle=linestyle)
 
     def _draw_empty_plots(self) -> None:
         """Render placeholder text on empty subplots."""
@@ -173,3 +226,4 @@ class AnalysisPanel(ttk.Frame):
             ax.grid(True, linestyle=":", alpha=0.5)
 
         self.canvas.draw()
+

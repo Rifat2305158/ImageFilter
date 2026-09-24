@@ -8,6 +8,7 @@ import tkinter as tk
 from app.gui.header import Header
 from app.gui.status_bar import StatusBar
 from app.gui.image_view import ImageView
+from app.gui.image_area import ImageArea
 from app.gui.filter_panel import FilterPanel
 from app.gui.main_window import MainWindow
 
@@ -61,6 +62,29 @@ def test_image_view_widget(tk_root):
     assert view._photo_image is None
 
 
+def test_image_area_widget(tk_root):
+    """Test ImageArea view mode selection, difference calculation, and view toggle."""
+    area = ImageArea(tk_root)
+    assert area.get_view_mode() == "Side-by-Side"
+
+    orig = np.full((10, 10), 100.0, dtype=np.float64)
+    proc = np.full((10, 10), 150.0, dtype=np.float64)
+
+    area.set_images(orig, proc)
+
+    # Difference should be absolute difference 50.0
+    assert area._diff_image is not None
+    np.testing.assert_array_almost_equal(area._diff_image, np.full((10, 10), 50.0))
+
+    # Toggle view switching
+    area.toggle_view()
+    assert area.get_view_mode() in ("Original Only", "Processed Only")
+
+    area.view_mode_var.set("Difference Image")
+    area._apply_view_mode()
+    assert area.get_view_mode() == "Difference Image"
+
+
 def test_filter_panel_selection(tk_root):
     """Test FilterPanel selection and button callbacks."""
     selected_filter = []
@@ -101,6 +125,7 @@ def test_main_window_initialization():
     assert hasattr(window, "header")
     assert hasattr(window, "status_bar")
     assert hasattr(window, "control_panel")
+    assert hasattr(window, "image_area")
     assert hasattr(window, "original_view")
     assert hasattr(window, "processed_view")
 
@@ -113,3 +138,48 @@ def test_main_window_initialization():
     np.testing.assert_array_equal(window.processed_image, synth_img)
 
     window.destroy()
+
+
+def test_image_view_displays_rgb_array(tk_root):
+    """ImageView must correctly render a 3D RGB array (H, W, 3) without errors."""
+    view = ImageView(tk_root, title="RGB Test View")
+
+    rgb_array = np.zeros((20, 20, 3), dtype=np.float64)
+    rgb_array[:, :, 0] = 200.0  # red channel
+    rgb_array[:, :, 1] = 100.0  # green channel
+    rgb_array[:, :, 2] = 50.0   # blue channel
+
+    # Must not raise – should produce a valid PhotoImage
+    view.set_image(rgb_array)
+
+    assert view.get_image() is not None
+    assert view._photo_image is not None
+    assert view.get_image().shape == (20, 20, 3)
+
+
+def test_image_area_handles_rgb_images(tk_root):
+    """ImageArea must compute difference image correctly for matching-shape RGB arrays."""
+    area = ImageArea(tk_root)
+
+    orig = np.full((10, 10, 3), 100.0, dtype=np.float64)
+    proc = np.full((10, 10, 3), 150.0, dtype=np.float64)
+
+    area.set_images(orig, proc)
+
+    # Difference should be absolute difference 50.0 across all channels
+    assert area._diff_image is not None
+    assert area._diff_image.shape == (10, 10, 3)
+    np.testing.assert_array_almost_equal(area._diff_image, np.full((10, 10, 3), 50.0))
+
+
+def test_image_area_rgb_grayscale_mismatch(tk_root):
+    """ImageArea should handle shape mismatch (RGB original, grayscale processed) gracefully."""
+    area = ImageArea(tk_root)
+
+    orig = np.full((10, 10, 3), 100.0, dtype=np.float64)
+    proc = np.full((10, 10), 80.0, dtype=np.float64)   # edge detection output
+
+    # Should not raise; diff_image should be None due to shape mismatch
+    area.set_images(orig, proc)
+    assert area._diff_image is None
+

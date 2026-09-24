@@ -115,5 +115,33 @@ def test_sharpen_invalid_args():
     with pytest.raises(ValueError, match="Unsupported sharpening method"):
         apply_sharpen(image, method='invalid_method')
 
-    with pytest.raises(ValueError, match="Input image must be a 2D array"):
-        apply_sharpen(np.ones((5, 5, 3)), method='basic')
+    with pytest.raises(ValueError, match="3D RGB image must have|Input image must be"):
+        apply_sharpen(np.ones((5, 5, 4)), method='basic')
+
+
+
+def test_rgb_sharpen_preserves_structure():
+    """Verify that RGB sharpening preserves 3-channel structure and works on each channel."""
+    rgb_image = np.full((10, 10, 3), 100.0, dtype=np.float64)
+    rgb_image[5, 5, 0] = 200.0  # R impulse
+    rgb_image[5, 5, 1] = 180.0  # G impulse
+    rgb_image[5, 5, 2] = 160.0  # B impulse
+
+    sharpened = apply_sharpen(rgb_image, method='basic', padding_mode='edge')
+    assert sharpened.shape == (10, 10, 3)
+
+    # Center pixels should be sharpened (overshoot clipped to 255.0 or increased)
+    assert sharpened[5, 5, 0] > 200.0 or sharpened[5, 5, 0] == 255.0
+    assert sharpened[5, 5, 1] > 180.0
+    assert sharpened[5, 5, 2] > 160.0
+
+
+def test_rgb_unsharp_mask():
+    """Verify Unsharp Masking on 3D RGB array."""
+    from src.filters.sharpening import apply_unsharp_mask
+    rgb_image = np.full((12, 12, 3), 128.0, dtype=np.float64)
+    rgb_image[:, :6, 0] = 50.0  # Step edge on Red channel
+
+    result = apply_unsharp_mask(rgb_image, radius=3, amount=1.5, padding_mode='edge')
+    assert result.shape == (12, 12, 3)
+

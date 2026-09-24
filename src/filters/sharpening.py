@@ -60,8 +60,8 @@ def apply_sharpen(
     Raises:
         ValueError: If image is not 2D or method is unsupported.
     """
-    if image.ndim != 2:
-        raise ValueError(f"Input image must be a 2D array, got shape {image.shape}")
+    if image.ndim not in (2, 3):
+        raise ValueError(f"Input image must be a 2D or 3D RGB array, got shape {image.shape}")
 
     image_float = image.astype(np.float64)
 
@@ -96,41 +96,30 @@ def apply_unsharp_mask(
     clip_range: tuple = (0.0, 255.0),
 ) -> np.ndarray:
     """
-    Apply Unsharp Masking (USM) to a 2D grayscale image.
+Applies Unsharp Masking (USM) to a 2D grayscale or 3D RGB image.
 
-    Algorithm:
-        1. Blur the image using a Gaussian kernel of given radius.
-        2. Compute mask (high-frequency detail):
-               mask = original - blurred
-        3. Amplify and add back:
-               output = original + amount * mask
-                      = (1 + amount) * original - amount * blurred
+Formula:
+    mask = original - blurred
+    output = original + amount * mask
 
-    This technique is clearly visible on high-resolution images because the
-    radius controls how large a neighborhood is used for detail extraction.
+Args:
+    image: 2D array or 3D RGB array.
+    radius: Gaussian kernel size. Must be odd (e.g., 3, 5, 7).
+    amount: Strength multiplier.
+    padding_mode: Convolution padding scheme ('zero', 'reflect', 'edge').
+    clip: If True, clips intensities to `clip_range`.
+    clip_range: Min/max values for clipping.
 
-    Args:
-        image (np.ndarray): 2D input grayscale image array (float64 or uint8).
-        radius (int): Gaussian blur kernel size. Must be odd (3, 5, 7, 9, 11).
-                      Larger radius = stronger, more visible sharpening effect
-                      on large images. Recommended: 5–9 for 1080p+ images.
-        amount (float): Sharpening strength multiplier.
-                        - 0.5  : subtle
-                        - 1.0  : moderate
-                        - 1.5  : visible (default)
-                        - 2.5+ : aggressive / oversharpened
-        padding_mode (str): Padding strategy for convolution ('zero', 'reflect', 'edge').
-        clip (bool): Constrain output to clip_range. Default True.
-        clip_range (tuple): (min, max) intensity values for output clipping.
+Returns:
+    Sharpened float64 array (2D or 3D).
 
-    Returns:
-        np.ndarray: Sharpened image as 2D float64 NumPy array.
+Raises:
+    ValueError: If image is not 2D/3D, radius is even, or amount <= 0.
+"""
 
-    Raises:
-        ValueError: If image is not 2D, radius is even, or amount is non-positive.
-    """
-    if image.ndim != 2:
-        raise ValueError(f"Input image must be a 2D array, got shape {image.shape}")
+    if image.ndim not in (2, 3):
+        raise ValueError(f"Input image must be a 2D or 3D RGB array, got shape {image.shape}")
+
 
     if radius < 3 or radius % 2 == 0:
         raise ValueError(f"radius must be an odd integer >= 3, got {radius}.")

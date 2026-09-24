@@ -6,11 +6,15 @@ from src.core.convolution import convolve2d
 def test_invalid_image_dimensions():
     kernel = np.ones((3, 3))
     # 1D image
-    with pytest.raises(ValueError, match="Image must be a 2D array"):
+    with pytest.raises(ValueError, match="Image must be a 2D array or 3D RGB array"):
         convolve2d(np.array([1, 2, 3]), kernel)
-    # 3D image
-    with pytest.raises(ValueError, match="Image must be a 2D array"):
-        convolve2d(np.ones((3, 3, 3)), kernel)
+    # 4D image
+    with pytest.raises(ValueError, match="Image must be a 2D array or 3D RGB array"):
+        convolve2d(np.ones((3, 3, 3, 3)), kernel)
+    # 3D image with 4 channels (RGBA)
+    with pytest.raises(ValueError, match="3D RGB image must have exactly 3 channels"):
+        convolve2d(np.ones((3, 3, 4)), kernel)
+
 
 def test_invalid_kernel_dimensions():
     image = np.ones((5, 5))
@@ -120,9 +124,61 @@ def test_edge_padding():
                       [7, 8, 9]])
     kernel = np.ones((3, 3))
     result = convolve2d(image, kernel, padding_mode='edge')
-    # Edge array for top-left (1) with 1 pad:
-    # 1 1 2
-    # 1 1 2
-    # 4 4 5
-    # Sum = 1+1+2 + 1+1+2 + 4+4+5 = 21
     assert result[0, 0] == 21.0
+
+
+
+def test_rgb_identity_kernel():
+    """Test that identity kernel leaves 3D RGB array unchanged."""
+    rgb_image = np.zeros((4, 4, 3), dtype=np.float64)
+    rgb_image[:, :, 0] = 10.0  # R
+    rgb_image[:, :, 1] = 20.0  # G
+    rgb_image[:, :, 2] = 30.0  # B
+
+    identity_kernel = np.array([[0, 0, 0], [0, 1, 0], [0, 0, 0]], dtype=np.float64)
+    res = convolve2d(rgb_image, identity_kernel, padding_mode='edge')
+
+    assert res.shape == (4, 4, 3)
+    np.testing.assert_array_equal(res, rgb_image)
+
+
+def test_rgb_averaging_kernel():
+    """Test 3D RGB array convolved with averaging kernel across all channels."""
+    rgb_image = np.ones((5, 5, 3), dtype=np.float64)
+    rgb_image[:, :, 0] *= 90.0
+    rgb_image[:, :, 1] *= 180.0
+    rgb_image[:, :, 2] *= 270.0
+
+    avg_kernel = np.ones((3, 3), dtype=np.float64) / 9.0
+    res = convolve2d(rgb_image, avg_kernel, padding_mode='edge')
+
+    assert res.shape == (5, 5, 3)
+    np.testing.assert_array_almost_equal(res, rgb_image)
+
+
+def test_rgb_channel_independence():
+    """Verify that distinct RGB channels are processed independently without cross-channel bleeding."""
+    rgb_image = np.zeros((3, 3, 3), dtype=np.float64)
+    rgb_image[1, 1, 0] = 100.0  # Impulse on Red channel center
+    rgb_image[1, 1, 1] = 50.0   # Impulse on Green channel center
+    rgb_image[1, 1, 2] = 10.0   # Impulse on Blue channel center
+
+    kernel = np.array([[0, 0, 0], [0, 2.0, 0], [0, 0, 0]], dtype=np.float64)
+    res = convolve2d(rgb_image, kernel, padding_mode='zero')
+
+    assert res[1, 1, 0] == 200.0
+    assert res[1, 1, 1] == 100.0
+    assert res[1, 1, 2] == 20.0
+
+
+def test_rgb_output_shape_and_invalid_channels():
+    """Verify RGB output shape and invalid channel count validation."""
+    valid_rgb = np.random.rand(6, 8, 3)
+    k = np.ones((3, 3)) / 9.0
+    res = convolve2d(valid_rgb, k)
+    assert res.shape == (6, 8, 3)
+
+    invalid_4ch = np.random.rand(6, 8, 4)
+    with pytest.raises(ValueError, match="3D RGB image must have exactly 3 channels"):
+        convolve2d(invalid_4ch, k)
+
