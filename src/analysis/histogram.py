@@ -38,12 +38,22 @@ def calculate_histogram(
 
     Returns:
         Tuple[np.ndarray, np.ndarray]: (counts, bin_edges) arrays.
+
+    Raises:
+        TypeError: If image is not a NumPy array.
+        ValueError: If image is empty or has unsupported dimensions.
     """
     if not isinstance(image, np.ndarray):
         raise TypeError("Input image must be a NumPy array.")
 
     if image.size == 0:
         raise ValueError("Input image array cannot be empty.")
+
+    if image.ndim not in (2, 3) or (image.ndim == 3 and image.shape[2] != 3):
+        raise ValueError(
+            f"Unsupported array shape {image.shape}. "
+            "Expected 2D (H, W) or 3D (H, W, 3)."
+        )
 
     clipped = np.clip(image.astype(np.float64).ravel(), range_bounds[0], range_bounds[1])
     counts, bin_edges = np.histogram(clipped, bins=bins, range=range_bounds)

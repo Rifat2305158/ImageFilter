@@ -28,7 +28,7 @@ from app.filters.blur import apply_blur
 from app.filters.sharpen import apply_sharpen, apply_unsharp_mask
 from app.filters.edges import apply_edge
 from app.core.convolution import convolve2d
-
+from app.core.image_state import ImageState
 
 
 def _parse_kernel_size(filter_name: str, default: int = 3) -> int:
@@ -67,12 +67,50 @@ class MainWindow(tk.Tk):
         self.geometry("1280x780")
         self.minsize(1000, 620)
 
-        # Image state arrays (float64)
-        self.original_image: Optional[np.ndarray] = None
-        self.processed_image: Optional[np.ndarray] = None
+        # Image state manager (float64 arrays)
+        self.image_state = ImageState()
 
         # Kernel Editor Window instance reference
         self.kernel_editor_win: Optional[KernelEditorWindow] = None
+
+        self._configure_styles()
+        self._build_layout()
+
+    @property
+    def original_image(self) -> Optional[np.ndarray]:
+        """Return the original loaded image array."""
+        return self.image_state.original_image
+
+    @original_image.setter
+    def original_image(self, val: Optional[np.ndarray]) -> None:
+        if val is None:
+            self.image_state.clear()
+        else:
+            self.image_state.set_image(val)
+
+    @property
+    def current_image(self) -> Optional[np.ndarray]:
+        """Return the current working/processed image array."""
+        return self.image_state.current_image
+
+    @current_image.setter
+    def current_image(self, val: Optional[np.ndarray]) -> None:
+        if val is None:
+            self.image_state.clear()
+        else:
+            self.image_state.update_current(val)
+
+    @property
+    def processed_image(self) -> Optional[np.ndarray]:
+        """Alias for current_image for backward compatibility."""
+        return self.image_state.current_image
+
+    @processed_image.setter
+    def processed_image(self, val: Optional[np.ndarray]) -> None:
+        if val is None:
+            self.image_state.clear()
+        else:
+            self.image_state.update_current(val)
 
         self._configure_styles()
         self._build_layout()
@@ -201,7 +239,7 @@ class MainWindow(tk.Tk):
 
         self.kernel_editor_win = KernelEditorWindow(
             self,
-            image_array=self.original_image,
+            image_array=self.current_image,
             on_apply_kernel=self.handle_apply_custom_kernel
         )
 
@@ -226,16 +264,13 @@ class MainWindow(tk.Tk):
             image_array = load_image(file_path)
             elapsed = time.perf_counter() - t0
 
-            self.original_image = image_array
-            self.processed_image = image_array.copy()
+            self.image_state.set_image(image_array)
 
-            self.image_area.set_images(self.original_image, self.processed_image)
+            self.image_area.set_images(self.original_image, self.current_image)
             self.filter_comp_panel.set_image(self.original_image)
 
             # Update analysis with initial (identical) original & processed
-            self.analysis_panel.update_analysis(self.original_image, self.processed_image)
-
-
+            self.analysis_panel.update_analysis(self.original_image, self.current_image)
 
             filename = Path(file_path).name
             h, w = image_array.shape[:2]
@@ -248,8 +283,8 @@ class MainWindow(tk.Tk):
             self.status_bar.set_status("Error loading image file.")
 
     def handle_apply_filter(self, filter_name: str) -> None:
-        """Apply selected filter algorithm to original image array and update status."""
-        if self.original_image is None:
+        """Apply selected filter algorithm to current image array and update status."""
+        if self.current_image is None:
             messagebox.showwarning("No Image Loaded", "Please load an image before applying a filter.")
             return
 
@@ -263,6 +298,8 @@ class MainWindow(tk.Tk):
         self.status_bar.set_status(f"Applying '{filter_name}'...")
         self.update_idletasks()
 
+        input_image = self.current_image
+
         def compute() -> tuple[np.ndarray, str]:
             desc_str = filter_name
             iterations = self.control_panel.get_iterations()
@@ -271,7 +308,7 @@ class MainWindow(tk.Tk):
             if fn_lower.startswith("box blur"):
                 size = _parse_kernel_size(filter_name, default=3)
                 result = apply_blur(
-                    self.original_image,
+                    input_image,
                     blur_type='box',
                     size=size,
                     padding_mode='edge',
@@ -280,7 +317,7 @@ class MainWindow(tk.Tk):
             elif fn_lower.startswith("gaussian blur"):
                 size = _parse_kernel_size(filter_name, default=3)
                 result = apply_blur(
-                    self.original_image,
+                    input_image,
                     blur_type='gaussian',
                     size=size,
                     padding_mode='edge',
@@ -288,7 +325,7 @@ class MainWindow(tk.Tk):
                 )
             elif filter_name == "Basic Sharpen":
                 result = apply_sharpen(
-                    self.original_image,
+                    input_image,
                     method='basic',
                     padding_mode='edge',
                 )
@@ -296,7 +333,7 @@ class MainWindow(tk.Tk):
                     result = apply_sharpen(result, method='basic', padding_mode='edge')
             elif filter_name == "Strong Sharpen":
                 result = apply_sharpen(
-                    self.original_image,
+                    input_image,
                     method='strong',
                     padding_mode='edge',
                 )
@@ -310,7 +347,7 @@ class MainWindow(tk.Tk):
                 usm_amount = float(a_match.group(1)) if a_match else 1.5
                 usm_amount_total = usm_amount * iterations
                 result = apply_unsharp_mask(
-                    self.original_image,
+                    input_image,
                     radius=usm_radius,
                     amount=usm_amount_total,
                     padding_mode='edge',
@@ -323,7 +360,7 @@ class MainWindow(tk.Tk):
                 normalize = self.control_panel.get_edge_normalize()
 
                 result = apply_edge(
-                    self.original_image,
+                    input_image,
                     operator=op,
                     direction=direction,
                     padding_mode='edge'
@@ -337,7 +374,7 @@ class MainWindow(tk.Tk):
                         result = (result / max_val) * 255.0
 
                 base_desc = f"{op.capitalize()} Edge ({direction.capitalize()})"
-                if self.original_image.ndim == 3:
+                if input_image.ndim == 3:
                     desc_str = f"{base_desc} [RGB→Grayscale luma]"
                 else:
                     desc_str = base_desc
@@ -350,19 +387,23 @@ class MainWindow(tk.Tk):
 
     def handle_apply_custom_kernel(self, kernel_matrix: np.ndarray) -> None:
         """Apply custom user-designed matrix kernel using manual convolve2d engine."""
-        if self.original_image is None:
+        if self.current_image is None:
             messagebox.showwarning("No Image Loaded", "Please load an image before applying custom kernel.")
             return
 
         k_h, k_w = kernel_matrix.shape
         self.kernel_info_panel.display_kernel_info(f"Custom Kernel ({k_h}x{k_w})", custom_matrix=kernel_matrix)
 
-        self.status_bar.set_status(f"Applying custom {k_h}x{k_w} kernel...")
+        input_image = self.current_image
+        is_rgb = (input_image.ndim == 3 and input_image.shape[2] == 3)
+        mode_desc = "RGB (per-channel)" if is_rgb else "Grayscale"
+        self.status_bar.set_status(f"Applying custom {k_h}x{k_w} kernel to {mode_desc} image...")
         self.update_idletasks()
 
         def compute() -> tuple[np.ndarray, str]:
-            res = convolve2d(self.original_image, kernel_matrix, padding_mode='edge')
-            return res, f"Custom {k_h}x{k_w} Kernel"
+            res = convolve2d(input_image, kernel_matrix, padding_mode='edge')
+            desc = f"Custom {k_h}x{k_w} Kernel [RGB per-channel]" if is_rgb else f"Custom {k_h}x{k_w} Kernel"
+            return res, desc
 
         self._execute_filter_computation(compute)
 
@@ -383,19 +424,27 @@ class MainWindow(tk.Tk):
 
     def _on_filter_success(self, result: np.ndarray, desc_str: str, elapsed: float) -> None:
         """Main thread callback executed after background convolution completes."""
-        self.processed_image = result
-        self.image_area.set_images(self.original_image, self.processed_image)
-        self.analysis_panel.update_analysis(self.original_image, self.processed_image)
-        self.status_bar.set_status(f"Applied {desc_str} in {elapsed:.3f}s")
+        self.image_state.update_current(result, description=desc_str)
+        self.image_area.set_images(self.original_image, self.current_image)
+        self.analysis_panel.update_analysis(self.original_image, self.current_image)
 
-        # Update info bar: show original mode + processed shape
-        orig_mode = "RGB" if (self.original_image is not None and self.original_image.ndim == 3) else "Grayscale"
-        proc_mode = "RGB" if result.ndim == 3 else "Grayscale"
-        h, w = result.shape[:2]
-        if orig_mode == proc_mode:
-            self.status_bar.set_info(f"Image: {orig_mode} | Size: {w} × {h}")
+        step_count = len(self.image_state.history)
+        if step_count > 1:
+            self.status_bar.set_status(f"Applied {desc_str} in {elapsed:.3f}s (Step {step_count} in chain)")
         else:
-            self.status_bar.set_info(f"Input: {orig_mode} → Output: {proc_mode} | Size: {w} × {h}")
+            self.status_bar.set_status(f"Applied {desc_str} in {elapsed:.3f}s")
+
+        # Update info bar: show original mode + current shape
+        orig_mode = "RGB" if (self.original_image is not None and self.original_image.ndim == 3) else "Grayscale"
+        curr_mode = "RGB" if result.ndim == 3 else "Grayscale"
+        h, w = result.shape[:2]
+        if orig_mode == curr_mode:
+            if curr_mode == "RGB" and "Custom" in desc_str:
+                self.status_bar.set_info(f"Image: RGB | Size: {w} × {h} | Per-Channel (R, G, B) Convolved")
+            else:
+                self.status_bar.set_info(f"Image: {curr_mode} | Size: {w} × {h}")
+        else:
+            self.status_bar.set_info(f"Input: {orig_mode} → Current: {curr_mode} | Size: {w} × {h}")
 
     def _on_filter_error(self, err_msg: str) -> None:
         """Main thread callback executed if background convolution fails."""
@@ -408,7 +457,7 @@ class MainWindow(tk.Tk):
         if self.original_image is None:
             return
 
-        self.processed_image = self.original_image.copy()
+        self.image_state.reset()
         self.image_area.set_images(self.original_image, self.processed_image)
 
         # Refresh analysis panel after reset (orig == processed again)
