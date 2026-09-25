@@ -40,6 +40,7 @@ class FilterPanel(ttk.LabelFrame):
         parent: tk.Widget,
         on_load: Optional[Callable[[], None]] = None,
         on_apply: Optional[Callable[[str], None]] = None,
+        on_undo: Optional[Callable[[], None]] = None,
         on_reset: Optional[Callable[[], None]] = None,
         on_save: Optional[Callable[[], None]] = None,
         on_open_editor: Optional[Callable[[], None]] = None,
@@ -49,6 +50,7 @@ class FilterPanel(ttk.LabelFrame):
 
         self.on_load_cb = on_load
         self.on_apply_cb = on_apply
+        self.on_undo_cb = on_undo
         self.on_reset_cb = on_reset
         self.on_save_cb = on_save
         self.on_open_editor_cb = on_open_editor
@@ -174,6 +176,10 @@ class FilterPanel(ttk.LabelFrame):
         output_label.grid(row=row, column=0, sticky="w", pady=(0, 4))
         row += 1
 
+        self.btn_undo = ttk.Button(self, text="↶ Undo Step", command=self._on_undo_click, state="disabled")
+        self.btn_undo.grid(row=row, column=0, sticky="ew", pady=3)
+        row += 1
+
         self.btn_reset = ttk.Button(self, text="↺ Reset Image", command=self._on_reset_click)
         self.btn_reset.grid(row=row, column=0, sticky="ew", pady=3)
         row += 1
@@ -184,7 +190,14 @@ class FilterPanel(ttk.LabelFrame):
 
         self._update_edge_subpanel_visibility()
 
+    def set_undo_enabled(self, enabled: bool) -> None:
+        """Enable or disable the Undo button based on processing history state."""
+        if hasattr(self, "btn_undo"):
+            state = "normal" if enabled else "disabled"
+            self.btn_undo.config(state=state)
+
     def get_selected_filter(self) -> str:
+
         """Return the currently selected main filter string."""
         return self.filter_var.get()
 
@@ -245,6 +258,10 @@ class FilterPanel(ttk.LabelFrame):
         if self.on_open_editor_cb:
             self.on_open_editor_cb()
 
+    def _on_undo_click(self) -> None:
+        if self.on_undo_cb:
+            self.on_undo_cb()
+
     def _on_reset_click(self) -> None:
         if self.on_reset_cb:
             self.on_reset_cb()
@@ -252,3 +269,4 @@ class FilterPanel(ttk.LabelFrame):
     def _on_save_click(self) -> None:
         if self.on_save_cb:
             self.on_save_cb()
+
