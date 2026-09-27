@@ -315,7 +315,9 @@ class MainWindow(tk.Tk):
 
             self.image_state.set_image(image_array)
 
-            self.image_area.set_images(self.original_image, self.current_image)
+            self.image_area.set_images(
+                self.original_image, self.current_image, self.image_state.previous_image
+            )
             self.filter_comp_panel.set_image(self.original_image)
 
             # Update analysis with initial (identical) original & processed
@@ -472,7 +474,9 @@ class MainWindow(tk.Tk):
     def _on_filter_success(self, result: np.ndarray, desc_str: str, elapsed: float) -> None:
         """Main thread callback executed after background convolution completes."""
         self.image_state.update_current(result, description=desc_str)
-        self.image_area.set_images(self.original_image, self.current_image)
+        self.image_area.set_images(
+            self.original_image, self.current_image, self.image_state.previous_image
+        )
         self.analysis_panel.update_analysis(self.original_image, self.current_image)
 
         step_count = len(self.image_state.history)
@@ -492,7 +496,11 @@ class MainWindow(tk.Tk):
 
         restored_img = self.image_state.undo()
         if restored_img is not None:
-            self.image_area.set_images(self.original_image, self.current_image)
+            # previous_image now reflects the input of the newest remaining chain
+            # step (or None when the whole chain has been undone)
+            self.image_area.set_images(
+                self.original_image, self.current_image, self.image_state.previous_image
+            )
             self.analysis_panel.update_analysis(self.original_image, self.current_image)
             self._update_history_panel()
 
@@ -508,7 +516,9 @@ class MainWindow(tk.Tk):
             return
 
         self.image_state.reset()
-        self.image_area.set_images(self.original_image, self.current_image)
+        self.image_area.set_images(
+            self.original_image, self.current_image, self.image_state.previous_image
+        )
         self.analysis_panel.update_analysis(self.original_image, self.current_image)
         self._update_history_panel()
 

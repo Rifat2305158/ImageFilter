@@ -316,6 +316,53 @@ def test_applying_filter_after_undo_and_reset():
     np.testing.assert_array_equal(state.current_image, f4_res)
 
 
+def test_previous_image_tracking_through_chain_and_undo():
+    """Verify previous_image exposes the image right before the latest filter, including after undo."""
+    img = np.full((10, 10), 10.0, dtype=np.float64)
+    state = ImageState(img)
+
+    # No filter applied yet -> no previous image
+    assert state.previous_image is None
+
+    step1 = np.full((10, 10), 20.0, dtype=np.float64)
+    state.update_current(step1, description="Filter 1")
+    np.testing.assert_array_equal(state.previous_image, img)
+
+    # Chained second filter: previous image is step1, NOT the original image
+    step2 = np.full((10, 10), 30.0, dtype=np.float64)
+    state.update_current(step2, description="Filter 2")
+    np.testing.assert_array_equal(state.previous_image, step1)
+    np.testing.assert_array_equal(state.current_image, step2)
+
+    # Undo: previous image becomes the input of the newest remaining step
+    state.undo()
+    np.testing.assert_array_equal(state.current_image, step1)
+    np.testing.assert_array_equal(state.previous_image, img)
+
+    # Undo everything: chain empty -> no previous image
+    state.undo()
+    assert state.previous_image is None
+
+    # Reset also clears previous image availability
+    state.update_current(np.full((10, 10), 40.0), description="Filter 3")
+    state.reset()
+    assert state.previous_image is None
+
+
+def test_previous_image_independent_copy():
+    """Verify previous_image returns an independent copy safe from external mutation."""
+    img = np.full((8, 8), 60.0, dtype=np.float64)
+    state = ImageState(img)
+    state.update_current(np.full((8, 8), 90.0), description="Blur")
+
+    prev_copy = state.previous_image
+    prev_copy[0, 0] = 999.0
+
+    # Internal history snapshot must remain unaffected
+    assert state.previous_image[0, 0] == 60.0
+    np.testing.assert_array_equal(state.previous_image, img)
+
+
 def test_history_operation_metadata():
     """Verify useful operation metadata is captured in HistoryEntry."""
     img = np.zeros((10, 10, 3), dtype=np.float64)

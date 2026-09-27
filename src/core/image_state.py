@@ -110,6 +110,19 @@ class ImageState:
         return self._current_image.copy()
 
     @property
+    def previous_image(self) -> Optional[np.ndarray]:
+        """
+        Return a copy of the image state immediately before the latest filter operation.
+
+        With chained filters this is the input image of the most recent step, which
+        is not necessarily the original image. Returns None when no filter has been
+        applied yet (empty history).
+        """
+        if not self._history_stack:
+            return None
+        return self._history_stack[-1].image.copy()
+
+    @property
     def history(self) -> List[str]:
         """Return a list of human-readable operation descriptions in history."""
         return [entry.description for entry in self._history_stack]
