@@ -2,8 +2,9 @@
 ImageArea container component for Image Blur, Sharpening & Edge Detection Studio.
 
 Holds OriginalImageFrame and ProcessedImageFrame, providing side-by-side view,
-single image views, normalized difference image visualization, quick view toggle,
-and optional synchronized display sizing. Strictly uses grid() layout management.
+single image views, previous-step (pre-filter) image inspection, normalized
+difference image visualization, quick view toggle, and optional synchronized
+display sizing. Strictly uses grid() layout management.
 """
 
 import tkinter as tk
@@ -20,13 +21,14 @@ class ImageArea(ttk.Frame):
     with interactive comparison options.
     """
 
-    VIEW_MODES = ["Side-by-Side", "Original Only", "Processed Only", "Difference Image"]
+    VIEW_MODES = ["Side-by-Side", "Original Only", "Processed Only", "Previous Image", "Difference Image"]
 
     def __init__(self, parent: tk.Widget, **kwargs):
         super().__init__(parent, padding=5, **kwargs)
 
         self._orig_image: Optional[np.ndarray] = None
         self._proc_image: Optional[np.ndarray] = None
+        self._prev_image: Optional[np.ndarray] = None
         self._diff_image: Optional[np.ndarray] = None
 
         self._active_single_view: str = "original"  # "original" or "processed"
@@ -102,17 +104,21 @@ class ImageArea(ttk.Frame):
     def set_images(
         self, 
         orig_img: Optional[np.ndarray], 
-        proc_img: Optional[np.ndarray]
+        proc_img: Optional[np.ndarray],
+        prev_img: Optional[np.ndarray] = None
     ) -> None:
         """
-        Update original and processed image arrays and recalculate difference.
+        Update original, processed, and previous image arrays and recalculate difference.
 
         Args:
             orig_img (np.ndarray | None): Original image array.
             proc_img (np.ndarray | None): Processed image array.
+            prev_img (np.ndarray | None): Image state before the latest filter step;
+                None when no filter has been applied yet (or the chain is empty).
         """
         self._orig_image = orig_img.copy() if orig_img is not None else None
         self._proc_image = proc_img.copy() if proc_img is not None else None
+        self._prev_image = prev_img.copy() if prev_img is not None else None
 
         # Compute absolute difference map
         if self._orig_image is not None and self._proc_image is not None and self._orig_image.shape == self._proc_image.shape:
@@ -143,6 +149,9 @@ class ImageArea(ttk.Frame):
                 self.view_mode_var.set("Original Only")
                 self._active_single_view = "original"
         elif mode == "Difference Image":
+            self.view_mode_var.set("Side-by-Side")
+
+        elif mode == "Previous Image":
             self.view_mode_var.set("Side-by-Side")
 
         self._apply_view_mode()
@@ -177,6 +186,16 @@ class ImageArea(ttk.Frame):
             self.processed_frame.grid(row=0, column=0, columnspan=2, sticky="nsew", padx=0, pady=2)
             self.processed_frame.config(text="Processed Result")
             self.processed_frame.set_image(self._proc_image)
+
+        elif mode == "Previous Image":
+            self.original_frame.grid_forget()
+            self.processed_frame.grid(row=0, column=0, columnspan=2, sticky="nsew", padx=0, pady=2)
+            if self._prev_image is not None:
+                self.processed_frame.config(text="Previous Image (Before Last Filter)")
+                self.processed_frame.set_image(self._prev_image)
+            else:
+                self.processed_frame.config(text="Previous Image (No Filter Applied Yet)")
+                self.processed_frame.set_image(None)
 
         elif mode == "Difference Image":
             self.original_frame.grid_forget()

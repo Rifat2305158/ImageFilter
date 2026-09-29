@@ -47,6 +47,12 @@ def calculate_image_statistics(image: np.ndarray) -> Dict[str, Any]:
     if image.size == 0:
         raise ValueError("Input image array cannot be empty.")
 
+    if image.ndim not in (2, 3) or (image.ndim == 3 and image.shape[2] != 3):
+        raise ValueError(
+            f"Unsupported array shape {image.shape}. "
+            "Expected 2D (H, W) or 3D (H, W, 3)."
+        )
+
     img_f = image.astype(np.float64).ravel()
 
     min_val = float(np.min(img_f))
@@ -59,6 +65,8 @@ def calculate_image_statistics(image: np.ndarray) -> Dict[str, Any]:
     # Edge density: percentage of pixel-channel values with response > 25.0
     edge_density = float(np.mean(img_f > 25.0) * 100.0)
 
+    channel_stats = calculate_channel_statistics(image)
+
     return {
         "min": min_val,
         "max": max_val,
@@ -67,6 +75,7 @@ def calculate_image_statistics(image: np.ndarray) -> Dict[str, Any]:
         "rms_energy": rms_energy,
         "edge_density": edge_density,
         "edge_max": max_val,
+        "channels": channel_stats,
     }
 
 

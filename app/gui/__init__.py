@@ -7,6 +7,7 @@ from app.gui.filter_panel import FilterPanel
 from app.gui.kernel_editor import KernelEditorWindow
 from app.gui.kernel_info import KernelInfoPanel
 from app.gui.filter_comparison import FilterComparisonPanel
+from app.gui.history_panel import HistoryPanel
 from app.gui.main_window import MainWindow
 
 __all__ = [
@@ -18,6 +19,7 @@ __all__ = [
     "KernelEditorWindow", 
     "KernelInfoPanel",
     "FilterComparisonPanel",
+    "HistoryPanel",
     "MainWindow"
 ]
 

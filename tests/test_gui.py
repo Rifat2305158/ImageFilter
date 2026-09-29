@@ -85,6 +85,33 @@ def test_image_area_widget(tk_root):
     assert area.get_view_mode() == "Difference Image"
 
 
+def test_image_area_previous_image_view_mode(tk_root):
+    """ImageArea 'Previous Image' mode shows the pre-filter image and clears when absent."""
+    area = ImageArea(tk_root)
+    assert "Previous Image" in ImageArea.VIEW_MODES
+
+    orig = np.full((10, 10), 100.0, dtype=np.float64)
+    proc = np.full((10, 10), 150.0, dtype=np.float64)
+    prev = np.full((10, 10), 120.0, dtype=np.float64)
+
+    area.set_images(orig, proc, prev)
+    assert area._prev_image is not None
+
+    area.view_mode_var.set("Previous Image")
+    area._apply_view_mode()
+    assert area.get_view_mode() == "Previous Image"
+    np.testing.assert_array_equal(area.processed_frame.get_image(), prev)
+
+    # Updating without a previous image (e.g. after full undo) clears the view
+    area.set_images(orig, proc)
+    assert area._prev_image is None
+    assert area.processed_frame.get_image() is None
+
+    # Quick toggle from Previous Image returns to Side-by-Side
+    area.toggle_view()
+    assert area.get_view_mode() == "Side-by-Side"
+
+
 def test_filter_panel_selection(tk_root):
     """Test FilterPanel selection and button callbacks."""
     selected_filter = []

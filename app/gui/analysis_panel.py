@@ -17,8 +17,14 @@ matplotlib.use("TkAgg")
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 from matplotlib.figure import Figure
 
-from app.analysis.statistics import calculate_image_statistics
-from app.analysis.histogram import calculate_histogram
+from app.analysis.statistics import (
+    calculate_image_statistics,
+    calculate_channel_statistics,
+)
+from app.analysis.histogram import (
+    calculate_histogram,
+    calculate_channel_histograms,
+)
 
 
 class AnalysisPanel(ttk.Frame):
@@ -121,19 +127,26 @@ class AnalysisPanel(ttk.Frame):
         orig_stats = calculate_image_statistics(orig_img) if orig_img is not None else None
         proc_stats = calculate_image_statistics(proc_img) if proc_img is not None else None
 
+        # Helper to set metric text
+        def _set_lbl(lbl: ttk.Label, img: Optional[np.ndarray], stats: Optional[dict], key: str):
+            if stats is None or img is None:
+                lbl.config(text="-")
+                return
+
+            if img.ndim == 3 and img.shape[2] == 3 and key in ("min", "max", "mean", "std"):
+                ch = stats.get("channels", {})
+                r_val = ch.get("red", {}).get(key, 0.0)
+                g_val = ch.get("green", {}).get(key, 0.0)
+                b_val = ch.get("blue", {}).get(key, 0.0)
+                lbl.config(text=f"R:{r_val:.1f} G:{g_val:.1f} B:{b_val:.1f}")
+            else:
+                val = stats[key]
+                lbl.config(text=f"{val:.2f}" if key == "edge_density" else f"{val:.4f}")
+
         # 1. Update Numerical Table Labels
         for key, (orig_lbl, proc_lbl) in self.stat_rows.items():
-            if orig_stats is not None:
-                val = orig_stats[key]
-                orig_lbl.config(text=f"{val:.2f}" if key == "edge_density" else f"{val:.4f}")
-            else:
-                orig_lbl.config(text="-")
-
-            if proc_stats is not None:
-                val = proc_stats[key]
-                proc_lbl.config(text=f"{val:.2f}" if key == "edge_density" else f"{val:.4f}")
-            else:
-                proc_lbl.config(text="-")
+            _set_lbl(orig_lbl, orig_img, orig_stats, key)
+            _set_lbl(proc_lbl, proc_img, proc_stats, key)
 
         # Update mode labels
         def _mode_str(arr):
@@ -184,17 +197,21 @@ class AnalysisPanel(ttk.Frame):
         ax.set_xlim(0, 255)
         ax.grid(True, linestyle=":", alpha=0.5)
 
+        ch_hists = calculate_channel_histograms(img)
+        centers = np.arange(256)
+
         if img.ndim == 3 and img.shape[2] == 3:
-            # Per-channel RGB histograms overlaid
-            channel_colors = [("#D9534F", "R"), ("#2DB85A", "G"), ("#3B90E0", "B")]
-            for ch_idx, (color, ch_label) in enumerate(channel_colors):
-                counts, _ = calculate_histogram(img[:, :, ch_idx])
-                centers = np.arange(256)
+            channel_info = [
+                ("red", "#D9534F", "R"),
+                ("green", "#2DB85A", "G"),
+                ("blue", "#3B90E0", "B"),
+            ]
+            for ch_key, color, ch_label in channel_info:
+                counts, _ = ch_hists[ch_key]
                 ax.plot(centers, counts, color=color, linewidth=1.0, alpha=0.8, label=ch_label)
             ax.legend(loc="upper right", fontsize=7)
         else:
-            counts, _ = calculate_histogram(img)
-            centers = np.arange(256)
+            counts, _ = ch_hists["gray"]
             ax.bar(centers, counts, color="#2B5B84", width=1.0, alpha=0.8)
 
     def _plot_comparison_lines(
@@ -205,14 +222,16 @@ class AnalysisPanel(ttk.Frame):
     ) -> None:
         """Plot comparison lines on the comparison axis. Handles both grayscale and RGB."""
         centers = np.arange(256)
+        ch_hists = calculate_channel_histograms(img)
+
         if img.ndim == 3 and img.shape[2] == 3:
-            ch_labels = ("R", "G", "B")
-            for ch_idx, (color, ch_label) in enumerate(zip(colors, ch_labels)):
-                counts, _ = calculate_histogram(img[:, :, ch_idx])
+            ch_info = [("red", "R"), ("green", "G"), ("blue", "B")]
+            for (ch_key, ch_label), color in zip(ch_info, colors):
+                counts, _ = ch_hists[ch_key]
                 ax.plot(centers, counts, color=color, label=f"{label_prefix}-{ch_label}",
                         linewidth=1.2, linestyle=linestyle, alpha=0.8)
         else:
-            counts, _ = calculate_histogram(img)
+            counts, _ = ch_hists["gray"]
             ax.plot(centers, counts, color=colors[0], label=label_prefix,
                     linewidth=1.5, linestyle=linestyle)
 
